@@ -123,3 +123,31 @@ body.tv .scope-hud { font-size: 1.1vw; }
   body.tv #queue li > .t { flex-basis: 4vw; }
   body.tv .scope-hud > * + * { margin-left: 1.4vw; }
 }
+
+/* v0.5: photos, facts, categories */
+.photo { display: none; width: 100%; height: 96px; object-fit: cover; border-radius: 8px; margin-bottom: 8px; background: #0b1114; }
+.photo.on { display: block; }
+#next .photo { grid-column: 1 / -1; margin: 6px 0 0; height: 80px; }
+.facts { font-size: 11px; color: var(--dim); margin-top: 4px; line-height: 1.4; }
+.cls { margin-top: 10px; font-size: 12px; line-height: 1.8; }
+.cls span { display: inline-block; margin-right: 12px; white-space: nowrap; }
+.cls b { color: var(--phos); font-weight: 600; }
+.cls i { color: var(--amber); font-style: normal; font-size: 10px; }
+body.tv .photo { height: 11vw; }
+body.tv .facts, body.tv .cls { font-size: 1.1vw; }
+/* TV must fit one screen without scrolling: keep the Next card lean */
+body.tv .photo { height: 8vw; }
+body.tv #n-photo, body.tv #n-facts { display: none !important; }
+body.tv .meta { font-size: 1.05vw; }
+body.tv #now .cs { font-size: 2.8vw; }
+body.tv .eta { font-size: 5vw; }
+body.tv .facts { font-size: .95vw; }
+body.tv .cls { font-size: 1vw; }
+body.tv #inbound, body.tv header p { display: none; }
+body.tv .compass { width: 5vw; height: 5vw; }
+body.tv .photo { height: 7vw; }
+body.tv aside { gap: 1vw; }
+body.tv #o-photo { float: right; width: 40%; height: 8vw; margin: 0 0 .5vw 1vw; }
+body.tv #now .body::after { content: ""; display: block; clear: both; }
+body.tv #n-meta { display: none; }
+body.tv header h1 { font-size: 2.4vw; margin: 0; }

@@ -1,3 +1,8 @@
 [
-  { "name": "SXM airport", "lat": 18.0410, "lon": -63.1089 }
+ {
+  "name": "SXM airport",
+  "lat": 18.041,
+  "lon": -63.1089,
+  "iata": "SXM"
+ }
 ]

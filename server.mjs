@@ -24,6 +24,9 @@ import { loadPlaces, placesInView } from './lib/places.mjs';
 import { newestExport, loadFlighty, flownMatch } from './lib/flighty.mjs';
 import { PassTracker, PassLog, summarize } from './lib/passlog.mjs';
 import { chainFromVrs, pickLeg } from './lib/routes.mjs';
+import { classify } from './lib/classify.mjs';
+import { typeFacts } from './lib/typefacts.mjs';
+import { inferEndpoint } from './lib/infer.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const BUILD = String(Date.now()); // changes on every restart; open screens reload themselves
@@ -55,7 +58,10 @@ let feedTurn = 0;
 
 // Reference points (airports, neighbourhoods, friends' places) come from SEE_WHO_FLY_PLACES, a file
 // outside the repo. They're sent to the browser as relative x/y, and only if inside the plotted window.
-const LANDMARKS = placesInView(loadPlaces(process.env.SEE_WHO_FLY_PLACES), frame, VIEW_RADIUS_M);
+const PLACES = loadPlaces(process.env.SEE_WHO_FLY_PLACES);
+const LANDMARKS = placesInView(PLACES, frame, VIEW_RADIUS_M);
+// Places with an "iata" code are treated as local airports for landing/departing inference.
+const AIRPORTS = PLACES.filter((p) => p.iata).map((p) => ({ iata: String(p.iata).slice(0, 4), name: p.name, ...toLocal(p.lat, p.lon) }));
 
 // ---------- per-aircraft description ----------
 // "Worth looking up?" is decided by how big the plane will look (wingspan over 3-D distance), not by a
@@ -80,6 +86,8 @@ function describe(ac, now) {
   const look = onGround ? { tier: null } : predictLook({ x: p.x, y: p.y, altFt, gs: ac.gs, track: ac.track, vrate, posAge: ac.seen_pos, type: clean(ac.t, 4), mil: ((ac.dbFlags ?? 0) & 1) === 1 }, LOOK);
 
   const callsign = clean(ac.flight) || '';
+  const mil = ((ac.dbFlags ?? 0) & 1) === 1, type = clean(ac.t, 4), category = clean(ac.category, 2);
+  const st = { x: p.x, y: p.y, altFt, vrate, track: ac.track ?? null };
   return {
     hex: ac.hex.toLowerCase(), callsign, reg: clean(ac.r), type: clean(ac.t, 4), desc: cleanText(ac.desc),
     category: clean(ac.category, 2), squawk: clean(ac.squawk, 4), emergency: ac.emergency && ac.emergency !== 'none' ? clean(ac.emergency, 12) : null,
@@ -91,7 +99,12 @@ function describe(ac, now) {
     peakDeg: look.peakDeg ?? null, nowDeg: look.nowDeg ?? null, slantM: look.slantM ?? null,
     lookBearing: look.lookBearing ?? bearing, lookElev: look.lookElev ?? elevation,
     flown: flownMatch(flighty, clean(ac.r), callsign),
-    route: routeFor(callsign, { x: p.x, y: p.y, altFt, vrate, track: ac.track ?? null }),
+    route: onGround ? null : routeFor(callsign, st),
+    cls: classify({ callsign, type, mil, category }),
+    facts: typeFacts(type),
+    info: infoFor(ac.hex.toLowerCase()),
+    mph: ac.gs != null ? Math.round(ac.gs * 1.15078) : null,
+    aglFt: altFt == null ? null : Math.max(0, Math.round(altFt - cfg.ground_elev_ft)),
     t: now,
   };
 }
@@ -100,10 +113,53 @@ function describe(ac, now) {
 // airline alone when no leg fits. Never a guessed route.
 function routeFor(callsign, st) {
   const c = routeCache.get(callsign)?.v;
-  if (!c) return null;
-  const l = pickLeg(c.chain, st);
-  if (!l && !c.airline) return null;
-  return { airline: c.airline, ...(l || {}) };
+  const l = c ? pickLeg(c.chain, st) : null;
+  if (l) return { airline: c.airline, ...l };
+  // No listed leg fits: say what the plane itself shows, near a known local airport.
+  const e = inferEndpoint(st, AIRPORTS, cfg.ground_elev_ft);
+  if (e) return { airline: c?.airline || null, inferred: e.kind, ...(e.kind === 'landing' ? { to: e.airport } : { from: e.airport }) };
+  return c?.airline ? { airline: c.airline } : null;
+}
+
+// ---------- aircraft info + photo (adsbdb, cached; photos proxied so the page stays self-contained) ----------
+const infoCache = new Map(); // hex -> { v: { owner, maker, model, photoUrl }, at, ttl }
+const infoQueue = new Set();
+const PHOTO_HOSTS = /^https:\/\/(image\.)?airport-data\.com\//;
+function infoFor(hex) {
+  const c = infoCache.get(hex)?.v;
+  return c ? { owner: c.owner, maker: c.maker, model: c.model, photo: c.photoUrl ? `/photo/${hex}` : null } : null;
+}
+async function infoWorker() {
+  for (;;) {
+    const hex = infoQueue.values().next().value;
+    if (!hex) { await sleep(700); continue; }
+    infoQueue.delete(hex);
+    const c = infoCache.get(hex);
+    if (c && Date.now() - c.at < c.ttl) continue;
+    let v = null, failed = false;
+    try {
+      const a = (await getJson(`https://api.adsbdb.com/v0/aircraft/${hex}`))?.response?.aircraft;
+      if (a && typeof a === 'object') {
+        const photo = [a.url_photo_thumbnail, a.url_photo].find((u) => typeof u === 'string' && PHOTO_HOSTS.test(u)) || null;
+        v = { owner: cleanText(a.registered_owner), maker: cleanText(a.manufacturer), model: cleanText(a.type), photoUrl: photo };
+      }
+    } catch { failed = true; }
+    infoCache.set(hex, { v, at: Date.now(), ttl: failed ? 10 * 60_000 : 24 * 3600_000 });
+    await sleep(500);
+  }
+}
+const photoCache = new Map(); // hex -> Buffer (small LRU)
+async function photoFor(hex) {
+  if (photoCache.has(hex)) return photoCache.get(hex);
+  const url = infoCache.get(hex)?.v?.photoUrl;
+  if (!url || !PHOTO_HOSTS.test(url)) return null;
+  const r = await fetch(url, { signal: AbortSignal.timeout(6000), headers: { 'user-agent': 'see-who-fly/0.5' } });
+  if (!r.ok || !/^image\/(jpeg|png|webp)/.test(r.headers.get('content-type') || '')) return null;
+  const buf = Buffer.from(await r.arrayBuffer());
+  if (buf.length > 800_000) return null;
+  photoCache.set(hex, buf);
+  if (photoCache.size > 120) photoCache.delete(photoCache.keys().next().value);
+  return buf;
 }
 
 // ---------- Flighty history (local only; newest export wins) ----------
@@ -127,7 +183,7 @@ const ROUTE_TTL_MS = 6 * 3600_000, ROUTE_RETRY_MS = 5 * 60_000;
 const routeQueue = new Set();
 const cleanAirport = (a) => ({ ...a, iata: clean(a.iata, 4) || '?', name: cleanText(a.name) });
 async function getJson(url) {
-  const r = await fetch(url, { signal: AbortSignal.timeout(6000), headers: { 'user-agent': 'see-who-fly/0.4' } });
+  const r = await fetch(url, { signal: AbortSignal.timeout(6000), headers: { 'user-agent': 'see-who-fly/0.5' } });
   if (r.status === 404) return null;                 // genuinely not listed
   if (!r.ok) throw new Error(`HTTP ${r.status}`);    // try again later
   return r.json();
@@ -201,7 +257,7 @@ async function pollOnce() {
   const feed = FEEDS[i], fst = feedState[i];
   let j;
   try {
-    const r = await fetch(feed.url, { signal: AbortSignal.timeout(8000), headers: { 'user-agent': 'see-who-fly/0.4' } });
+    const r = await fetch(feed.url, { signal: AbortSignal.timeout(8000), headers: { 'user-agent': 'see-who-fly/0.5' } });
     if (!r.ok) throw new Error(`${feed.name} HTTP ${r.status}`);
     j = await r.json();
     fst.fails = 0;
@@ -215,6 +271,9 @@ async function pollOnce() {
       const c = routeCache.get(a.callsign);
       if (!c || now - c.at > c.ttl) routeQueue.add(a.callsign);
     }
+  }
+  for (const a of list) {
+    if (!a.onGround && (a.tier || a.overheadNow) && !infoCache.has(a.hex)) infoQueue.add(a.hex);
   }
   recordPasses(tracker.update(list, now));
   list.sort((a, b) => (a.etaS ?? 1e9) - (b.etaS ?? 1e9) || a.distM - b.distM);
@@ -281,13 +340,13 @@ function handleState(res) {
   lastViewer = Date.now();
   const stale = !state.updated || Date.now() - state.updated > STALE_MS;
   const live = stale ? [] : state.aircraft;
-  for (const a of live) a.route = routeFor(a.callsign, a);
+  for (const a of live) { a.route = a.onGround ? null : routeFor(a.callsign, a); a.info = infoFor(a.hex); }
   const sum = summarize(today.passes);
   const marks = latestMarks(today.marks);
   const withMarks = (o) => ({ ...o, marks: marks.get(o.hex) || null });
   // The last few passes (any size, so "heard one it didn't flag" can be marked too).
   const recent = today.passes.slice(-8).reverse()
-    .map(({ track, route, ...p }) => withMarks({ ...p, route: route && { from: route.from?.iata, to: route.to?.iata } }));
+    .map(({ track, route, ...p }) => withMarks({ ...p, route: route && { from: route.from?.iata, to: route.to?.iata, inferred: route.inferred } }));
   send(res, 200, JSON.stringify({
     ...state,
     stale,
@@ -319,6 +378,15 @@ http.createServer((req, res) => {
     try { url = new URL(req.url, 'http://localhost'); } catch { return send(res, 400, 'bad request', 'text/plain'); }
     if (url.pathname === '/api/mark' && req.method === 'POST') return handleMark(req, res);
     if (url.pathname === '/api/state') return handleState(res);
+    const ph = /^\/photo\/(~?[0-9a-f]{6})$/.exec(url.pathname);
+    if (ph) {
+      photoFor(ph[1]).then((buf) => {
+        if (!buf) return send(res, 404, 'no photo', 'text/plain');
+        res.writeHead(200, { ...SECURITY, 'content-type': 'image/jpeg', 'cache-control': 'max-age=86400' });
+        res.end(buf);
+      }, () => send(res, 404, 'no photo', 'text/plain'));
+      return;
+    }
     if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, 'method not allowed', 'text/plain');
     return handleStatic(url, res, req.method);
   } catch (e) {
@@ -328,6 +396,7 @@ http.createServer((req, res) => {
 }).listen(PORT, HOST, () => {
   refreshFlighty(); setInterval(refreshFlighty, 3600_000);
   routeWorker();
+  infoWorker();
   pollForever();
   console.log(`see-who-fly on http://${HOST}:${PORT}  (look-up ${cfg.lookup_deg}°/${cfg.heads_deg}°, view ${cfg.view_radius_nm} nm, ${LANDMARKS.length} places, log ${passLog.dir || 'off'})`);
 });

@@ -27,9 +27,11 @@
       <div class="label">OVERHEAD NOW</div>
       <div class="empty" id="o-last">Nothing overhead.</div>
       <div class="body">
+        <img id="o-photo" class="photo" alt="">
         <div class="cs"><span id="o-cs"></span> <span id="o-mil" class="mil">MIL</span></div>
         <div class="route" id="o-route"></div>
         <div class="meta" id="o-meta"></div>
+        <div id="o-facts" class="facts"></div>
         <div id="o-flown" class="flown"></div>
         <div id="o-marks"></div>
       </div>
@@ -44,7 +46,9 @@
           <div class="cs"><span id="n-cs"></span> <span id="n-mil" class="mil">MIL</span></div>
           <div class="route" id="n-route"></div>
           <div class="meta" id="n-meta"></div>
+          <div class="facts" id="n-facts"></div>
         </div>
+        <img id="n-photo" class="photo" alt="">
         <div class="look">
           <svg viewBox="-50 -50 100 100" class="compass">
             <circle r="44" class="ring"/>
@@ -58,7 +62,7 @@
       </div>
     </article>
 
-    <article class="card">
+    <article class="card" id="inbound">
       <div class="label">INBOUND</div>
       <ol id="queue"></ol>
     </article>
@@ -71,6 +75,7 @@
         <div><b id="s-mil">0</b><small>military</small></div>
         <div><b id="s-near">0</b><small>in view now</small></div>
       </div>
+      <div id="s-cls" class="cls"></div>
       <div id="s-types" class="types dim"></div>
     </article>
 

@@ -121,7 +121,35 @@ requestAnimationFrame(draw);
 
 const fl = (ft) => (ft == null ? '' : ft >= 18000 ? `FL${Math.round(ft / 100)}` : `${Math.round(ft / 100) * 100}′`);
 const mi = (m) => `${(m / M_PER_MI).toFixed(m < M_PER_MI ? 2 : 1)} mi`;
-const routeTxt = (r) => (r && (r.from || r.to) ? `${(r.from && r.from.iata) || '?'} → ${(r.to && r.to.iata) || '?'}` : '');
+const routeTxt = (r) => {
+  if (!r) return '';
+  if (r.inferred === 'landing' && r.to) return `→ ${r.to.iata} (landing)`;
+  if (r.inferred === 'departing' && r.from) return `${r.from.iata} → (departing)`;
+  return r.from || r.to ? `${(r.from && r.from.iata) || '?'} → ${(r.to && r.to.iata) || '?'}` : '';
+};
+const CLS = [['airline', '✈️', 'airline'], ['privateplus', '💼', 'private plus'], ['private', '🛩️', 'private'], ['cargo', '📦', 'cargo'], ['heli', '🚁', 'helicopter'], ['military', '🎖️', 'military']];
+const num = (n) => (n == null ? '' : String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ','));
+// Plain-units live line: height above the house, mph, climbing/descending rate.
+function liveLine(a) {
+  const parts = [];
+  if (a.aglFt != null) parts.push(`${num(Math.round(a.aglFt / 50) * 50)} ft up`);
+  if (a.mph != null) parts.push(`${a.mph} mph`);
+  if (a.vrate > 300) parts.push(`climbing ${num(Math.round(a.vrate / 100) * 100)} ft/min`);
+  else if (a.vrate < -300) parts.push(`descending ${num(Math.round(-a.vrate / 100) * 100)} ft/min`);
+  else parts.push('level');
+  return parts.join(' · ');
+}
+function factsLine(a) {
+  const f = a.facts, i = a.info, parts = [];
+  if (i && i.owner) parts.push(i.owner);
+  if (f) parts.push(`${f.engines} · ${f.spanFt} ft wingspan, ${f.compare} · ${f.loud}`);
+  return parts.join(' · ');
+}
+function setPhoto(el, a) {
+  const src = a.info && a.info.photo;
+  if (src && el.getAttribute('src') !== src) { el.setAttribute('src', src); el.onerror = function () { el.className = 'photo'; }; }
+  el.className = src ? 'photo on' : 'photo';
+}
 
 function renderPanel(force) {
   const age = (performance.now() - fetchedAt) / 1000;
@@ -139,7 +167,9 @@ function renderPanel(force) {
     $('o-cs').textContent = overhead.callsign || overhead.reg || overhead.hex;
     $('o-mil').className = 'mil' + (overhead.mil ? ' on' : '');
     $('o-route').textContent = [overhead.route && overhead.route.airline, routeTxt(overhead.route)].filter(Boolean).join(' · ');
-    $('o-meta').textContent = [overhead.desc || overhead.type, overhead.reg, fl(overhead.altFt), overhead.gs != null ? `${Math.round(overhead.gs)} kt` : ''].filter(Boolean).join(' · ');
+    $('o-meta').textContent = [overhead.desc || overhead.type, overhead.reg, liveLine(overhead)].filter(Boolean).join(' · ');
+    $('o-facts').textContent = factsLine(overhead);
+    setPhoto($('o-photo'), overhead);
     $('o-flown').textContent = flownTxt(overhead.flown);
     byHex[overhead.hex] = overhead;
     if (force || !$('o-marks').contains(document.activeElement)) $('o-marks').innerHTML = SWF.markRow(overhead);
@@ -160,8 +190,9 @@ function renderPanel(force) {
     $('n-cs').textContent = `${next.callsign || next.reg || next.hex}`;
     $('n-mil').className = 'mil' + (next.mil ? ' on' : '');
     $('n-route').textContent = [next.route && next.route.airline, routeTxt(next.route)].filter(Boolean).join(' · ');
-    $('n-meta').textContent = [next.desc || next.type, next.reg, fl(next.altFt), next.gs != null ? `${Math.round(next.gs)} kt` : '',
-      next.vrate > 300 ? 'climbing' : next.vrate < -300 ? 'descending' : 'level'].filter(Boolean).join(' · ');
+    $('n-meta').textContent = [next.desc || next.type, next.reg, liveLine(next)].filter(Boolean).join(' · ');
+    $('n-facts').textContent = factsLine(next);
+    setPhoto($('n-photo'), next);
     $('n-needle').setAttribute('transform', `rotate(${next.lookBearing})`);
     $('n-look').innerHTML = next.overheadNow
       ? `<b>Straight up.</b> ${fl(next.altFt)} above you.`
@@ -179,6 +210,11 @@ function renderPanel(force) {
   $('s-low').textContent = S.today.lowest ? fl(S.today.lowest.altFt) : '—';
   $('s-mil').textContent = S.today.milCount;
   $('s-near').textContent = airborne.length;
+  const bc = S.today.byClass || {};
+  $('s-cls').innerHTML = CLS.map(function (c) {
+    const v = bc[c[0]] || { all: 0, lookup: 0 };
+    return `<span title="${c[2]}">${c[1]} <b>${v.all}</b> ${c[2]}${v.lookup ? ` <i>${v.lookup} look-up</i>` : ''}</span>`;
+  }).join('');
   $('s-types').textContent = Object.entries(S.today.types).sort((a, b) => b[1] - a[1]).map(([t, n]) => `${t}×${n}`).join('  ');
 }
 
