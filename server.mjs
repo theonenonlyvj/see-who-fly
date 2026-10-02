@@ -2,7 +2,7 @@
 // No dependencies. Node 18+ (global fetch).
 //
 // Personal data never lives in this repo:
-//   SEE_WHO_FLY_HOME_CONFIG   path to { lat, lon, tz, ground_elev_ft, view_radius_nm, alert_lead_s, lookup_deg, heads_deg }
+//   SEE_WHO_FLY_HOME_CONFIG   path to { lat, lon, tz, ground_elev_ft, view_radius_nm, alert_lead_s, overhead_hold_s, lookup_deg, heads_deg }
 //   SEE_WHO_FLY_PLACES        optional path to private reference points [{ name, lat, lon }]
 //   SEE_WHO_FLY_FLIGHTY_DIR   optional dir of Flighty exports; the newest FlightyExport-*.csv is used and re-checked hourly
 //   SEE_WHO_FLY_FLIGHTY_CSV   optional single export (used if no dir is given)
@@ -25,6 +25,7 @@ import { newestExport, loadFlighty, flownMatch } from './lib/flighty.mjs';
 import { PassTracker, PassLog, summarize } from './lib/passlog.mjs';
 import { chainFromVrs, pickLeg } from './lib/routes.mjs';
 import { classify } from './lib/classify.mjs';
+import { OverheadHold } from './lib/hold.mjs';
 import { typeFacts } from './lib/typefacts.mjs';
 import { inferEndpoint } from './lib/infer.mjs';
 
@@ -32,7 +33,7 @@ const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const BUILD = String(Date.now()); // changes on every restart; open screens reload themselves
 const cfgPath = process.env.SEE_WHO_FLY_HOME_CONFIG || path.join(ROOT, 'config.example.json');
 const cfg = {
-  ground_elev_ft: 0, view_radius_nm: 6, feed_radius_nm: 10, alert_lead_s: 90, log_within_mi: 2, lookup_deg: 2.0, heads_deg: 0.8,
+  ground_elev_ft: 0, view_radius_nm: 6, feed_radius_nm: 10, alert_lead_s: 90, overhead_hold_s: 90, log_within_mi: 2, lookup_deg: 2.0, heads_deg: 0.8,
   tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
   ...JSON.parse(fs.readFileSync(cfgPath, 'utf8')),
 };
@@ -249,6 +250,7 @@ function recordPasses(passes) {
 }
 
 // ---------- feed polling ----------
+const hold = new OverheadHold({ holdS: cfg.overhead_hold_s });
 let state = { updated: null, aircraft: [], error: null };
 let lastViewer = 0;
 
@@ -284,6 +286,7 @@ async function pollOnce() {
     // limited to near-overhead planes would itself point at the house.
     if (!a.onGround && a.distM <= VIEW_RADIUS_M && !infoFresh(a.hex)) infoQueue.add(a.hex);
   }
+  hold.track(list, now);
   recordPasses(tracker.update(list, now));
   list.sort((a, b) => (a.etaS ?? 1e9) - (b.etaS ?? 1e9) || a.distM - b.distM);
   state = { updated: now, aircraft: list, error: null, feed: feed.name };
@@ -350,6 +353,7 @@ function handleState(res) {
   const stale = !state.updated || Date.now() - state.updated > STALE_MS;
   const live = stale ? [] : state.aircraft;
   for (const a of live) { a.route = a.onGround ? null : routeFor(a.callsign, a); a.info = infoFor(a.hex); }
+  hold.annotate(live, Date.now());
   const sum = summarize(today.passes);
   const marks = latestMarks(today.marks);
   const withMarks = (o) => ({ ...o, marks: marks.get(o.hex) || null });
@@ -361,7 +365,7 @@ function handleState(res) {
     stale,
     build: BUILD,
     // The client gets thresholds and relative positions; it never needs the home coordinates.
-    config: { viewRadiusM: VIEW_RADIUS_M, alertLeadS: cfg.alert_lead_s, lookupDeg: cfg.lookup_deg, headsDeg: cfg.heads_deg, tz: cfg.tz },
+    config: { viewRadiusM: VIEW_RADIUS_M, alertLeadS: cfg.alert_lead_s, holdS: cfg.overhead_hold_s, lookupDeg: cfg.lookup_deg, headsDeg: cfg.heads_deg, tz: cfg.tz },
     aircraft: live.map(withMarks),
     recent,
     landmarks: LANDMARKS,

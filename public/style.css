@@ -70,7 +70,9 @@ header p { margin: 4px 0 0; font-size: 11px; }
 #now .empty { display: none; color: var(--dim); font-size: 13px; }
 #now.idle .empty { display: block; }
 #now.idle .body { display: none; }
-#now:not(.idle) { border-color: var(--red); box-shadow: 0 0 32px rgba(255,93,93,0.33); animation: pulse 1s infinite; }
+#now.passed { border-color: var(--dim); }
+#now.passed .cs, #now.passed .label { color: var(--dim); }
+#now:not(.idle):not(.passed) { border-color: var(--red); box-shadow: 0 0 32px rgba(255,93,93,0.33); animation: pulse 1s infinite; }
 #now .cs { font-size: 26px; color: var(--red); }
 .mil { display: none; font-size: 11px; letter-spacing: .15em; color: #0b1114; background: #9ad0ff; border-radius: 4px; padding: 1px 6px; vertical-align: middle; }
 .mil.on { display: inline-block; }

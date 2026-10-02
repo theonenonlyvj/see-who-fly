@@ -18,7 +18,7 @@ document.getElementById('spots').addEventListener('click', (e) => {
 function card(p, kind) {
   byHex[p.hex] = p;
   const age = (Date.now() - fetchedAt) / 1000;
-  const when = kind === 'now' ? 'OVERHEAD NOW' : kind === 'soon' ? `IN ${Math.max(0, Math.round(p.etaS - age))}s` : SWF.time(p.at, S.config.tz);
+  const when = kind === 'now' ? 'OVERHEAD NOW' : kind === 'now passed' ? `JUST PASSED · ${Math.round(p.justPassedS + age)}s ago` : kind === 'soon' ? `IN ${Math.max(0, Math.round(p.etaS - age))}s` : SWF.time(p.at, S.config.tz);
   const end = (e) => (e && typeof e === 'object' ? e.iata : e) || '?';
   const route = !p.route ? '' : p.route.inferred === 'landing' ? ` · → ${end(p.route.to)} (landing)` : p.route.inferred === 'departing' ? ` · ${end(p.route.from)} → (departing)` : (p.route.from || p.route.to) ? ` · ${end(p.route.from)}→${end(p.route.to)}` : '';
   const dirn = kind === 'soon' ? `<div class="dirn">Look <b>${dir(p.lookBearing != null ? p.lookBearing : p.bearing)}</b>, ${Math.round(p.lookElev != null ? p.lookElev : (p.elevation != null ? p.elevation : 0))}° up</div>` : '';
@@ -30,11 +30,13 @@ function card(p, kind) {
 function render() {
   if (!S) return;
   const air = S.aircraft.filter((a) => !a.onGround);
+  // Planes that just passed stay up as long as you can still hear them, so they can be marked.
   const now = air.filter((a) => a.overheadNow);
-  const soon = air.filter((a) => !a.overheadNow && a.tier && a.etaS != null && a.etaS <= 240).sort((a, b) => a.etaS - b.etaS).slice(0, 3);
-  const live = new Set([...now, ...soon].map((a) => a.hex));
+  const passed = air.filter((a) => !a.overheadNow && a.justPassedS != null && a.justPassedS + (Date.now() - fetchedAt) / 1000 <= S.config.holdS).sort((a, b) => a.justPassedS - b.justPassedS);
+  const soon = air.filter((a) => !a.overheadNow && a.justPassedS == null && a.tier && a.etaS != null && a.etaS <= 240).sort((a, b) => a.etaS - b.etaS).slice(0, 3);
+  const live = new Set([...now, ...soon, ...passed].map((a) => a.hex));
   const recent = (S.recent || []).filter((p) => !live.has(p.hex)).slice(0, 5);
-  const html = [...now.map((p) => card(p, 'now')), ...soon.map((p) => card(p, 'soon')), ...recent.map((p) => card(p, 'past'))].join('');
+  const html = [...now.map((p) => card(p, 'now')), ...soon.map((p) => card(p, 'soon')), ...passed.map((p) => card(p, 'now passed')), ...recent.map((p) => card(p, 'past'))].join('');
   document.getElementById('cards').innerHTML = html || `<div class="empty-look">${S.stale ? 'Flight feed is down right now.' : 'Nothing worth looking up at right now.'}</div>`;
 }
 

@@ -19,3 +19,5 @@ body.lookpage { padding: 14px 14px 30px; max-width: 520px; margin: 0 auto; heigh
 .lookpage .foot { text-align: center; font-size: 12px; color: var(--dim); } .lookpage .foot a { color: var(--phos); }
 #now .marks, .recent .marks { grid-template-columns: 1fr 1fr 6px 1fr 1fr; }
 #now .mk { padding: 6px 2px; font-size: 11px; }
+.lk.now.passed { border-color: var(--dim); box-shadow: none; }
+.lk.now.passed .when { color: var(--dim); }

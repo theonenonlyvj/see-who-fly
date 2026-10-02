@@ -61,3 +61,14 @@ test('a plane far too high or too low for its distance is not "landing" (glide-a
   assert.equal(inferEndpoint({ x: -20000, y: 0, altFt: 900, vrate: -700, track: 90 }, airports, 0), null);  // ~0.8 deg: too flat
   assert.equal(inferEndpoint({ x: -2000, y: 0, altFt: 3900, vrate: -700, track: 90 }, airports, 0), null); // ~22 deg: too steep
 });
+
+test('flight-school trainers count as private even under an operator code', () => {
+  assert.equal(classify({ callsign: 'EPI251', type: 'C172' }), 'private'); // Epic Flight Academy, 10-02 miss
+  assert.equal(classify({ callsign: 'EPI12', type: 'P28A' }), 'private');
+  assert.equal(classify({ callsign: 'ATP45', type: 'DA42' }), 'private');
+  assert.equal(classify({ callsign: 'EPI7', type: 'BE58' }), 'private');
+  assert.equal(classify({ callsign: 'EPI12', type: 'DV20' }), 'private');  // Diamond DA20 Katana   // Baron multi-engine trainer
+  assert.equal(classify({ callsign: 'XYZ12', type: 'C208' }), 'airline');  // Caravan commuter stays airline
+  assert.equal(classify({ callsign: 'SWA16', type: 'B38M' }), 'airline'); // airlines unaffected
+  assert.equal(classify({ callsign: 'WIA531', type: 'DHC6' }), 'airline'); // commuter turboprop stays airline
+});

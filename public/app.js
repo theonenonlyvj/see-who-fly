@@ -165,9 +165,13 @@ function renderPanel(force) {
   $('boxline').textContent = `LOOK UP ≥ ${S.config.lookupDeg}° · heads-up ≥ ${S.config.headsDeg}° · alert ${S.config.alertLeadS}s · ${(S.config.viewRadiusM / M_PER_NM).toFixed(0)} nm`;
 
   const airborne = S.aircraft.filter((a) => !a.onGround);
-  const overhead = airborne.filter((a) => a.overheadNow).sort((a, b) => a.distM - b.distM)[0];
+  const bigNow = airborne.filter((a) => a.overheadNow).sort((a, b) => a.distM - b.distM)[0];
+  // Nothing big right now: keep the plane that just passed up while you can still hear it (and mark it).
+  const justPassed = bigNow ? null : airborne.filter((a) => a.justPassedS != null && a.justPassedS + age <= S.config.holdS).sort((a, b) => a.justPassedS - b.justPassedS)[0];
+  const overhead = bigNow || justPassed;
   const now = $('now');
-  now.className = 'card ' + (overhead ? '' : 'idle');
+  now.className = 'card ' + (bigNow ? '' : justPassed ? 'passed' : 'idle');
+  $('o-label').textContent = justPassed ? `JUST PASSED · ${Math.round(justPassed.justPassedS + age)}s ago` : 'OVERHEAD NOW';
   if (overhead) {
     $('o-cs').textContent = overhead.callsign || overhead.reg || overhead.hex;
     $('o-mil').className = 'mil' + (overhead.mil ? ' on' : '');
@@ -177,19 +181,24 @@ function renderPanel(force) {
     setPhoto($('o-photo'), overhead);
     $('o-flown').textContent = flownTxt(overhead.flown);
     byHex[overhead.hex] = overhead;
-    if (force || !$('o-marks').contains(document.activeElement)) $('o-marks').innerHTML = SWF.markRow(overhead);
+    // Rebuild the marks when the plane changes, even with a button focused, so a tap never marks the previous plane.
+    const marks = $('o-marks');
+    if (force || marks.getAttribute('data-for') !== overhead.hex || !marks.contains(document.activeElement)) {
+      marks.innerHTML = SWF.markRow(overhead);
+      marks.setAttribute('data-for', overhead.hex);
+    }
   } else {
     const l = S.today.last;
     $('o-last').textContent = l ? `Last: ${l.callsign || l.reg || l.hex} · ${l.type || '?'} · ${fl(l.altFt)} · ${SWF.time(l.at, S.config.tz)}` : 'Nothing overhead yet today.';
   }
 
-  document.title = overhead ? `LOOK UP · ${overhead.callsign || overhead.type || ''}` : 'see-who-fly';
+  document.title = bigNow ? `LOOK UP · ${overhead.callsign || overhead.type || ''}` : 'see-who-fly';
   const inbound = airborne.filter((a) => a.tier && a.etaS != null && a !== overhead).sort((a, b) => a.etaS - b.etaS);
   const next = inbound[0];
   const card = $('next');
   card.className = 'card ' + (!next ? 'idle' : next.overheadNow ? 'now' : next.etaS <= S.config.alertLeadS ? 'hot' : '');
   if (next) {
-    if (!overhead && next.tier === 'lookup' && next.etaS - age <= S.config.alertLeadS) document.title = `LOOK UP in ${eta(next)}s`;
+    if (!bigNow && next.tier === 'lookup' && next.etaS - age <= S.config.alertLeadS) document.title = `LOOK UP in ${eta(next)}s`;
     $('n-eta').textContent = eta(next);
     $('n-tier').textContent = next.tier === 'lookup' ? 'LOOK UP' : 'heads-up · small';
     $('n-cs').textContent = `${next.callsign || next.reg || next.hex}`;

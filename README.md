@@ -14,7 +14,7 @@ Have feedback? → **[Tell me here](https://theonenonlyvj.github.io/personal-sit
 
 - **Radar view.** Every aircraft within a few miles of your spot, moving smoothly, with trails.
 - **LOOK UP vs heads-up.** Planes are judged by *how big they'll look* from where you stand (wingspan over 3-D distance), not by a fixed box. A C-17 a mile away counts; a 737 at 35,000 ft never does.
-- **Overhead Now.** A big red card while a plane looks big right above you.
+- **Overhead Now.** A big red card while a plane looks big right above you. It stays up, greyed out as "just passed", for 90 seconds afterwards (planes are often still audible after they stop looking big), so you can still mark it. In busy traffic the next big plane takes the card, so `/look` on your phone is the place to mark: it lists every plane that just passed.
 - **Next Overhead.** A countdown (alert 90 s out, enough time to get outside), plus which way to look ("Look SE, 21° up"), the airline, route, aircraft type and altitude.
 - **"You've flown this plane."** If you give it your [Flighty](https://flighty.com/) export, it tells you when a plane overhead is one you've actually flown on, matched by tail number.
 - **Military flag.** Military aircraft get a blue color and a **MIL** badge.
@@ -80,6 +80,7 @@ Keep personal files out of the repo folder; `.gitignore` also blocks the usual n
 | `lookup_deg` | 2.0 | apparent size (degrees) for **LOOK UP** |
 | `heads_deg` | 0.8 | apparent size for **heads-up** (visible but small) |
 | `alert_lead_s` | 90 | how many seconds ahead a plane turns amber |
+| `overhead_hold_s` | 90 | how long a plane stays on the Overhead Now card (as "just passed") after it stops looking big |
 | `log_within_mi` | 2 | planes passing closer than this get saved to the log (big ones farther out are saved too) |
 | `feed_radius_nm` | 10 | how far out to ask the feed for planes (wider than the radar, for earlier warnings) |
 

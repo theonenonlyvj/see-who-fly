@@ -77,3 +77,13 @@ test('PassLog.read skips a corrupt line instead of dropping the whole day', asyn
   const log = new PassLog(d, () => '2026-01-01');
   assert.equal(log.read('2026-01-01').length, 2);
 });
+
+test('summarize re-classifies logged passes so rule fixes count today; a logged helicopter stands', () => {
+  const s = summarize([
+    { hex: 'a', callsign: 'EPI251', type: 'C172', cls: 'airline', overhead: false, at: 1 },
+    { hex: 'b', callsign: 'N911Q', type: 'EC35', cls: 'heli', overhead: false, at: 2 },
+  ]);
+  assert.equal(s.byClass.private.all, 1);
+  assert.equal(s.byClass.airline.all, 0);
+  assert.equal(s.byClass.heli.all, 1);
+});
