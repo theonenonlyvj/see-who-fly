@@ -26,6 +26,7 @@ import { PassTracker, PassLog, summarize } from './lib/passlog.mjs';
 import { chainFromVrs, pickLeg } from './lib/routes.mjs';
 import { classify, isCommonAirliner } from './lib/classify.mjs';
 import { OverheadHold } from './lib/hold.mjs';
+import { GhostFilter } from './lib/dedupe.mjs';
 import { typeFacts } from './lib/typefacts.mjs';
 import { inferEndpoint } from './lib/infer.mjs';
 import { originFromTrace, mergeTraces } from './lib/origin.mjs';
@@ -400,6 +401,7 @@ function recordPasses(passes) {
 }
 
 // ---------- feed polling ----------
+const ghosts = new GhostFilter();
 const hold = new OverheadHold({ holdS: cfg.overhead_hold_s, headsDeg: cfg.heads_deg });
 let state = { updated: null, aircraft: [], error: null };
 let lastViewer = 0;
@@ -424,7 +426,8 @@ async function pollOnce() {
     fst.fails++; fst.backoffUntil = now + Math.min(60_000, 2000 * 2 ** fst.fails);
     throw e;
   }
-  const list = (feed.list(j) || []).map((a) => describe(a, now)).filter(Boolean);
+  // One plane, two tracks (ADS-B + a "~" TIS-B/ADS-R copy): keep the real one.
+  const list = ghosts.apply((feed.list(j) || []).map((a) => describe(a, now)).filter(Boolean), now);
   for (const a of list) {
     if (a.callsign && !a.onGround) {
       const c = routeCache.get(a.callsign);
