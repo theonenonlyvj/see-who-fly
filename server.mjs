@@ -44,6 +44,10 @@ const VIEWER_WINDOW_MS = 60_000;
 
 const M_PER_MI = 1609.344, M_PER_FT = 0.3048, KT_TO_MS = 0.514444;
 const VIEW_RADIUS_M = cfg.view_radius_nm * 1852;
+// Feed fields are third-party text: keep only what an ICAO field can contain.
+const clean = (v, max = 10) => (v == null ? null : String(v).replace(/[^A-Za-z0-9-]/g, '').slice(0, max) || null);
+const cleanText = (v) => (v == null ? null : String(v).replace(/[^A-Za-z0-9 .,'()/-]/g, '').slice(0, 60) || null);
+
 const frame = makeFrame(cfg.lat, cfg.lon);
 const toLocal = frame.toLocal;
 
@@ -61,16 +65,13 @@ let feedTurn = 0;
 const PLACES = loadPlaces(process.env.SEE_WHO_FLY_PLACES);
 const LANDMARKS = placesInView(PLACES, frame, VIEW_RADIUS_M);
 // Places with an "iata" code are treated as local airports for landing/departing inference.
-const AIRPORTS = PLACES.filter((p) => p.iata).map((p) => ({ iata: String(p.iata).slice(0, 4), name: p.name, ...toLocal(p.lat, p.lon) }));
+const AIRPORTS = PLACES.filter((p) => p.iata).map((p) => ({ iata: clean(p.iata, 4), name: cleanText(p.name), ...toLocal(p.lat, p.lon) }));
 
 // ---------- per-aircraft description ----------
 // "Worth looking up?" is decided by how big the plane will look (wingspan over 3-D distance), not by a
 // fixed box: see lib/visibility.mjs. Tiers: 'lookup' (red) and 'heads' (amber); everything else is radar only.
 const LOOK = { groundFt: cfg.ground_elev_ft, lookupDeg: cfg.lookup_deg, headsDeg: cfg.heads_deg, horizonS: 240 };
 
-// Feed fields are third-party text: keep only what an ICAO field can contain.
-const clean = (v, max = 10) => (v == null ? null : String(v).replace(/[^A-Za-z0-9-]/g, '').slice(0, max) || null);
-const cleanText = (v) => (v == null ? null : String(v).replace(/[^A-Za-z0-9 .,'()/-]/g, '').slice(0, 60) || null);
 
 function describe(ac, now) {
   if (ac.lat == null || ac.lon == null) return null;
@@ -123,6 +124,8 @@ function routeFor(callsign, st) {
 
 // ---------- aircraft info + photo (adsbdb, cached; photos proxied so the page stays self-contained) ----------
 const infoCache = new Map(); // hex -> { v: { owner, maker, model, photoUrl }, at, ttl }
+const INFO_CACHE_MAX = 3000;
+const infoFresh = (hex) => { const c = infoCache.get(hex); return c && Date.now() - c.at < c.ttl; };
 const infoQueue = new Set();
 const PHOTO_HOSTS = /^https:\/\/(image\.)?airport-data\.com\//;
 function infoFor(hex) {
@@ -134,8 +137,7 @@ async function infoWorker() {
     const hex = infoQueue.values().next().value;
     if (!hex) { await sleep(700); continue; }
     infoQueue.delete(hex);
-    const c = infoCache.get(hex);
-    if (c && Date.now() - c.at < c.ttl) continue;
+    if (infoFresh(hex)) continue;
     let v = null, failed = false;
     try {
       const a = (await getJson(`https://api.adsbdb.com/v0/aircraft/${hex}`))?.response?.aircraft;
@@ -144,7 +146,9 @@ async function infoWorker() {
         v = { owner: cleanText(a.registered_owner), maker: cleanText(a.manufacturer), model: cleanText(a.type), photoUrl: photo };
       }
     } catch { failed = true; }
+    infoCache.delete(hex);
     infoCache.set(hex, { v, at: Date.now(), ttl: failed ? 10 * 60_000 : 24 * 3600_000 });
+    if (infoCache.size > INFO_CACHE_MAX) infoCache.delete(infoCache.keys().next().value);
     await sleep(500);
   }
 }
@@ -153,10 +157,13 @@ async function photoFor(hex) {
   if (photoCache.has(hex)) return photoCache.get(hex);
   const url = infoCache.get(hex)?.v?.photoUrl;
   if (!url || !PHOTO_HOSTS.test(url)) return null;
-  const r = await fetch(url, { signal: AbortSignal.timeout(6000), headers: { 'user-agent': 'see-who-fly/0.5' } });
-  if (!r.ok || !/^image\/(jpeg|png|webp)/.test(r.headers.get('content-type') || '')) return null;
-  const buf = Buffer.from(await r.arrayBuffer());
-  if (buf.length > 800_000) return null;
+  // No redirects (they could point anywhere); size checked before and while reading.
+  const r = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(6000), headers: { 'user-agent': 'see-who-fly/0.5' } });
+  if (r.status !== 200 || !/^image\/(jpeg|png|webp)/.test(r.headers.get('content-type') || '')) return null;
+  if (Number(r.headers.get('content-length') || 0) > 800_000) return null;
+  const chunks = []; let size = 0;
+  for await (const chunk of r.body) { size += chunk.length; if (size > 800_000) return null; chunks.push(chunk); }
+  const buf = Buffer.concat(chunks);
   photoCache.set(hex, buf);
   if (photoCache.size > 120) photoCache.delete(photoCache.keys().next().value);
   return buf;
@@ -273,7 +280,9 @@ async function pollOnce() {
     }
   }
   for (const a of list) {
-    if (!a.onGround && (a.tier || a.overheadNow) && !infoCache.has(a.hex)) infoQueue.add(a.hex);
+    // Look up every airborne plane in view, not only the ones headed overhead: a lookup pattern
+    // limited to near-overhead planes would itself point at the house.
+    if (!a.onGround && a.distM <= VIEW_RADIUS_M && !infoFresh(a.hex)) infoQueue.add(a.hex);
   }
   recordPasses(tracker.update(list, now));
   list.sort((a, b) => (a.etaS ?? 1e9) - (b.etaS ?? 1e9) || a.distM - b.distM);
@@ -382,7 +391,7 @@ http.createServer((req, res) => {
     if (ph) {
       photoFor(ph[1]).then((buf) => {
         if (!buf) return send(res, 404, 'no photo', 'text/plain');
-        res.writeHead(200, { ...SECURITY, 'content-type': 'image/jpeg', 'cache-control': 'max-age=86400' });
+        res.writeHead(200, { ...SECURITY, 'content-type': (buf[0] === 0x89 ? 'image/png' : buf[0] === 0x52 ? 'image/webp' : 'image/jpeg'), 'cache-control': 'max-age=86400' });
         res.end(buf);
       }, () => send(res, 404, 'no photo', 'text/plain'));
       return;

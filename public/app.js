@@ -142,13 +142,18 @@ function liveLine(a) {
 function factsLine(a) {
   const f = a.facts, i = a.info, parts = [];
   if (i && i.owner) parts.push(i.owner);
-  if (f) parts.push(`${f.engines} · ${f.spanFt} ft wingspan, ${f.compare} · ${f.loud}`);
+  if (f) parts.push(`${f.engines} · ${f.spanFt} ft ${f.compare}`);
   return parts.join(' · ');
 }
+const badPhotos = {};
 function setPhoto(el, a) {
   const src = a.info && a.info.photo;
-  if (src && el.getAttribute('src') !== src) { el.setAttribute('src', src); el.onerror = function () { el.className = 'photo'; }; }
-  el.className = src ? 'photo on' : 'photo';
+  if (!src || badPhotos[src]) { el.className = 'photo'; return; }
+  if (el.getAttribute('src') !== src) {
+    el.onerror = function () { badPhotos[src] = true; el.className = 'photo'; };
+    el.setAttribute('src', src);
+  }
+  el.className = 'photo on';
 }
 
 function renderPanel(force) {
@@ -208,13 +213,13 @@ function renderPanel(force) {
 
   $('s-count').textContent = S.today.overheadCount;
   $('s-low').textContent = S.today.lowest ? fl(S.today.lowest.altFt) : '—';
-  $('s-mil').textContent = S.today.milCount;
   $('s-near').textContent = airborne.length;
   const bc = S.today.byClass || {};
-  $('s-cls').innerHTML = CLS.map(function (c) {
-    const v = bc[c[0]] || { all: 0, lookup: 0 };
-    return `<span title="${c[2]}">${c[1]} <b>${v.all}</b> ${c[2]}${v.lookup ? ` <i>${v.lookup} look-up</i>` : ''}</span>`;
-  }).join('');
+  // Big number = look-ups (planes worth stepping out for); small = everything that passed nearby.
+  $('s-cls').innerHTML = CLS.filter(function (c) { return bc[c[0]] && bc[c[0]].all; }).map(function (c) {
+    const v = bc[c[0]];
+    return `<span>${c[1]} <b>${v.lookup}</b> ${c[2]} <i>of ${v.all}</i></span>`;
+  }).join('') || '<span class="dim">nothing yet today</span>';
   $('s-types').textContent = Object.entries(S.today.types).sort((a, b) => b[1] - a[1]).map(([t, n]) => `${t}×${n}`).join('  ');
 }
 
