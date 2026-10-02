@@ -96,9 +96,9 @@ function draw() {
 
     const t = trails.get(a.hex) || [];
     if (t.length > 1) {
-      ctx.strokeStyle = col + '55'; ctx.lineWidth = 1.2; ctx.beginPath();
+      ctx.strokeStyle = col; ctx.globalAlpha = 0.33; ctx.lineWidth = 1.2; ctx.beginPath();
       t.forEach((q, i) => { const [qx, qy] = P(q); i ? ctx.lineTo(qx, qy) : ctx.moveTo(qx, qy); });
-      ctx.lineTo(x, y); ctx.stroke();
+      ctx.lineTo(x, y); ctx.stroke(); ctx.globalAlpha = 1;
     }
     // Predicted path to the box for inbound traffic.
     if (inbound && a.track != null) {
@@ -126,7 +126,9 @@ const routeTxt = (r) => (r && (r.from || r.to) ? `${(r.from && r.from.iata) || '
 function renderPanel(force) {
   const age = (performance.now() - fetchedAt) / 1000;
   const eta = (a) => Math.max(0, Math.round(a.etaS - age));
-  $('clock').textContent = new Date().toLocaleTimeString('en-US', { hour12: false, timeZone: S.config.tz });
+  // Old TV time-zone data may reject the zone: never let the clock take the panel down.
+  try { $('clock').textContent = new Date().toLocaleTimeString('en-US', { hour12: false, timeZone: S.config.tz }); }
+  catch (e) { $('clock').textContent = new Date().toLocaleTimeString('en-US', { hour12: false }); }
   $('boxline').textContent = `LOOK UP ≥ ${S.config.lookupDeg}° · heads-up ≥ ${S.config.headsDeg}° · alert ${S.config.alertLeadS}s · ${(S.config.viewRadiusM / M_PER_NM).toFixed(0)} nm`;
 
   const airborne = S.aircraft.filter((a) => !a.onGround);

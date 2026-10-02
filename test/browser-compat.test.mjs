@@ -10,5 +10,13 @@ test('browser code avoids syntax newer than Chromium 56', () => {
     assert.doesNotMatch(src, /\?\.(?!\d)/, `${f}: optional chaining`);
     assert.doesNotMatch(src, /\?\?/, `${f}: nullish coalescing`);
     assert.doesNotMatch(src, /\{\s*\.\.\.|,\s*\.\.\.\w+\s*\}/, `${f}: object spread`);
+    assert.doesNotMatch(src, /catch\s*\{/, `${f}: catch without a binding (Chromium 66)`);
+    assert.doesNotMatch(src, /#[0-9a-fA-F]{6}['"]\s*\+\s*['"][0-9a-fA-F]{2}|col \+ '[0-9a-fA-F]{2}'/, `${f}: 8-digit hex colour (Chromium 62)`);
+  }
+});
+
+test('stylesheets avoid 8-digit hex colours (Chromium 62)', () => {
+  for (const f of ['public/style.css', 'public/look.css']) {
+    assert.doesNotMatch(fs.readFileSync(f, 'utf8'), /#[0-9a-fA-F]{8}\b/, f);
   }
 });

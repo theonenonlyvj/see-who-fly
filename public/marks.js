@@ -29,7 +29,7 @@ SWF.wireMarks = (root, planesByHex, onChange) => {
     try {
       r = await fetch('/api/mark', { method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify(Object.assign({ hex, callsign: b.dataset.cs || null, spot }, next)) });
-    } catch { b.classList.add('err'); return; }
+    } catch (e) { b.classList.add('err'); return; }
     if (r.ok) {
       const { mark } = await r.json();
       plane.marks = Object.assign({}, plane.marks || {}, { [spot]: mark });
@@ -38,4 +38,7 @@ SWF.wireMarks = (root, planesByHex, onChange) => {
   });
 };
 
-SWF.time = (ms, tz) => new Date(ms).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz || undefined });
+SWF.time = (ms, tz) => {
+  try { return new Date(ms).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz || undefined }); }
+  catch (e) { return new Date(ms).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); }
+};

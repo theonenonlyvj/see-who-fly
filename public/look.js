@@ -44,7 +44,7 @@ async function tick() {
     if (build && S.build !== build) return location.reload();
     build = S.build;
     if (!document.querySelector('.lk .mk:focus')) render();
-  } catch {}
+  } catch (e) {}
 }
 SWF.wireMarks(document.getElementById('cards'), () => byHex, render);
 renderSpots(); tick(); setInterval(tick, 2000);

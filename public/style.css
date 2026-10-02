@@ -32,9 +32,9 @@ header p { margin: 4px 0 0; font-size: 11px; }
 #next .empty { display: none; color: var(--dim); font-size: 13px; }
 #next.idle .empty { display: block; }
 #next.idle .body { display: none; }
-#next.hot { border-color: var(--amber); box-shadow: 0 0 24px #ffb54733; }
-#next.now { border-color: var(--red); box-shadow: 0 0 32px #ff5d5d55; animation: pulse 1s infinite; }
-@keyframes pulse { 50% { box-shadow: 0 0 8px #ff5d5d33; } }
+#next.hot { border-color: var(--amber); box-shadow: 0 0 24px rgba(255,181,71,0.20); }
+#next.now { border-color: var(--red); box-shadow: 0 0 32px rgba(255,93,93,0.33); animation: pulse 1s infinite; }
+@keyframes pulse { 50% { box-shadow: 0 0 8px rgba(255,93,93,0.20); } }
 #next .body { display: grid; grid-template-columns: auto 1fr; grid-template-areas: "eta who" "look look" "flown flown"; gap: 10px 14px; align-items: center; }
 .eta { grid-area: eta; font-size: 54px; line-height: 1; color: var(--amber); font-variant-numeric: tabular-nums; }
 .eta small { font-size: 18px; color: var(--dim); }
@@ -70,7 +70,7 @@ header p { margin: 4px 0 0; font-size: 11px; }
 #now .empty { display: none; color: var(--dim); font-size: 13px; }
 #now.idle .empty { display: block; }
 #now.idle .body { display: none; }
-#now:not(.idle) { border-color: var(--red); box-shadow: 0 0 32px #ff5d5d55; animation: pulse 1s infinite; }
+#now:not(.idle) { border-color: var(--red); box-shadow: 0 0 32px rgba(255,93,93,0.33); animation: pulse 1s infinite; }
 #now .cs { font-size: 26px; color: var(--red); }
 .mil { display: none; font-size: 11px; letter-spacing: .15em; color: #0b1114; background: #9ad0ff; border-radius: 4px; padding: 1px 6px; vertical-align: middle; }
 .mil.on { display: inline-block; }
@@ -108,5 +108,18 @@ body.tv .scope-hud { font-size: 1.1vw; }
   .stats { display: flex; justify-content: space-around; }
   #queue li { display: flex; align-items: baseline; }
   #queue li > span:nth-child(2) { flex: 1; margin: 0 8px; }
-  .marks { display: flex; } .marks .mk { flex: 1; margin-right: 6px; }
+  .marks { display: flex; } .marks .mk { flex: 1; margin-right: 6px; } .marks .mk:last-child { margin-right: 0; }
+  /* flex gap is Chromium 84+: margins instead */
+  .scope-hud > * + * { margin-left: 18px; }
+  .compass { margin-right: 14px; }
+  #queue li + li { margin-top: 6px; }
+  #queue li > .t { flex: 0 0 46px; }
+  .stats > div { flex: 1; }
+  #next .who { flex: 1 1 0; min-width: 0; }
+  /* make the radar's size independent of flex height rules */
+  .scope { min-height: 100vh; }
+  #radar { position: absolute; top: 0; left: 0; }
+  body.tv aside > * + * { margin-top: 1.4vw; }
+  body.tv #queue li > .t { flex-basis: 4vw; }
+  body.tv .scope-hud > * + * { margin-left: 1.4vw; }
 }

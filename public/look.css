@@ -3,7 +3,7 @@ body.lookpage { padding: 14px 14px 30px; max-width: 520px; margin: 0 auto; heigh
 .spots button { padding: 12px 4px; border-radius: 10px; border: 1px solid var(--line); background: #071012; color: var(--dim); font: 600 14px var(--mono); }
 .spots button.on { color: #05080a; background: var(--phos); border-color: var(--phos); }
 .lk { border: 1px solid var(--line); border-radius: 14px; padding: 14px; margin-bottom: 12px; background: #071012; }
-.lk.now { border-color: var(--red); box-shadow: 0 0 24px #ff5d5d44; }
+.lk.now { border-color: var(--red); box-shadow: 0 0 24px rgba(255,93,93,0.27); }
 .lk.soon { border-color: var(--amber); }
 .lk .when { font-size: 12px; letter-spacing: .15em; color: var(--dim); }
 .lk.now .when { color: var(--red); } .lk.soon .when { color: var(--amber); }
