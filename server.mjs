@@ -29,6 +29,8 @@ import { OverheadHold } from './lib/hold.mjs';
 import { typeFacts } from './lib/typefacts.mjs';
 import { inferEndpoint } from './lib/infer.mjs';
 import { originFromTrace, mergeTraces } from './lib/origin.mjs';
+import { typeQuery, typeQueries, pickPage, creditFrom } from './lib/typephoto.mjs';
+import crypto from 'node:crypto';
 import zlib from 'node:zlib';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -229,6 +231,69 @@ async function photoFor(hex) {
   return buf;
 }
 
+// ---------- type photos (Wikipedia; for planes with no photo of their own) ----------
+// Keyed by the type search ("Embraer Phenom 300"), so each type is looked up once a day at most.
+// Type searches say nothing about where the house is.
+const WIKI_UA = { 'user-agent': 'see-who-fly/0.7 (https://github.com/theonenonlyvj/see-who-fly)' };
+const WIKI_THUMB = /^https:\/\/(upload|thumb)\.wikimedia\.org\//;
+const typeCache = new Map();   // query -> { v: { id, title, artist, license, thumb } | null, at, ttl }
+const typeById = new Map();    // id -> query
+const typeQueue = new Map();   // query (cache key) -> searches to try in order
+const typeFresh = (q) => { const c = typeCache.get(q); return c && Date.now() - c.at < c.ttl; };
+function typePhotoFor(q) {
+  const v = q && typeFresh(q) && typeCache.get(q).v;
+  return v ? { src: `/typephoto/${v.id}`, title: v.title, artist: v.artist, license: v.license, source: v.source } : null;
+}
+async function typeWorker() {
+  for (;;) {
+    const [q, job] = typeQueue.entries().next().value || [];
+    const { terms, maker } = job || {};
+    if (!q) { await sleep(1000); continue; }
+    typeQueue.delete(q);
+    if (typeFresh(q)) continue;
+    let v = null, ttl = 24 * 3600_000;
+    for (const term of terms || [q]) {
+      try {
+        const search = await getJsonH(`https://en.wikipedia.org/w/api.php?action=query&format=json&generator=search&gsrlimit=1&gsrsearch=${encodeURIComponent(term)}&prop=pageimages|info&piprop=name&inprop=url`);
+        const page = pickPage(search, term, maker);
+        if (!page) continue;
+        const info = await getJsonH(`https://en.wikipedia.org/w/api.php?action=query&format=json&titles=${encodeURIComponent('File:' + page.file)}&prop=imageinfo&iiprop=extmetadata|url&iiurlwidth=500`);
+        const c = creditFrom(info);
+        if (c && WIKI_THUMB.test(c.thumb)) {
+          const id = crypto.createHash('sha1').update(q).digest('hex').slice(0, 12);
+          typeById.set(id, q);
+          // Credit text is set with textContent on the page; creditFrom already limits it to name characters.
+          v = { id, title: page.title, artist: c.artist, license: c.license, source: c.source, thumb: c.thumb };
+          break;
+        }
+      } catch { ttl = 15 * 60_000; } // one failed search doesn't skip the other searches
+      await sleep(500);
+    }
+    typeCache.set(q, { v, at: Date.now(), ttl });
+    if (typeCache.size > 500) typeCache.delete(typeCache.keys().next().value);
+    await sleep(1000);
+  }
+}
+async function getJsonH(url) {
+  const r = await fetch(url, { signal: AbortSignal.timeout(8000), headers: WIKI_UA });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
+const typeImgCache = new Map(); // id -> Buffer (small LRU)
+async function typeImageFor(id) {
+  if (typeImgCache.has(id)) return typeImgCache.get(id);
+  const q = typeById.get(id);
+  const url = q && typeCache.get(q)?.v?.thumb;
+  if (!url || !WIKI_THUMB.test(url)) return null;
+  const r = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(8000), headers: WIKI_UA });
+  if (r.status !== 200 || !/^image\/(jpeg|png|webp)/.test(r.headers.get('content-type') || '')) { r.body?.cancel().catch(() => {}); return null; }
+  const buf = await readCapped(r, 800_000).catch(() => null);
+  if (!buf) return null;
+  typeImgCache.set(id, buf);
+  if (typeImgCache.size > 120) typeImgCache.delete(typeImgCache.keys().next().value);
+  return buf;
+}
+
 // ---------- Flighty history (local only; newest export wins) ----------
 let flighty = null;
 function refreshFlighty() {
@@ -415,7 +480,14 @@ function handleState(res) {
   lastViewer = Date.now();
   const stale = !state.updated || Date.now() - state.updated > STALE_MS;
   const live = stale ? [] : state.aircraft;
-  for (const a of live) { a.route = a.onGround ? null : routeFor(a.callsign, a, a.hex); a.info = infoFor(a.hex); }
+  for (const a of live) {
+    a.route = a.onGround ? null : routeFor(a.callsign, a, a.hex); a.info = infoFor(a.hex);
+    // No photo of its own and not an everyday airliner: show what its type looks like.
+    // Waits for the plane's own lookup, so a plane with its own photo never shows a type photo first.
+    const q = !a.onGround && !a.commonAirliner && infoFresh(a.hex) && !(a.info && a.info.photo) ? typeQuery(a.info || {}, a.desc) : null;
+    a.typePhoto = typePhotoFor(q);
+    if (q && !a.typePhoto && !typeFresh(q) && !typeQueue.has(q)) typeQueue.set(q, { terms: typeQueries(a.info || {}, a.desc), maker: (a.info && a.info.maker) || null });
+  }
   hold.annotate(live, Date.now());
   const sum = summarize(today.passes);
   const marks = latestMarks(today.marks);
@@ -463,8 +535,9 @@ http.createServer((req, res) => {
     if (url.pathname === '/api/mark' && req.method === 'POST') return handleMark(req, res);
     if (url.pathname === '/api/state') return handleState(res);
     const ph = /^\/photo\/(~?[0-9a-f]{6})$/.exec(url.pathname);
-    if (ph) {
-      photoFor(ph[1]).then((buf) => {
+    const tp = /^\/typephoto\/([0-9a-f]{12})$/.exec(url.pathname);
+    if (ph || tp) {
+      (ph ? photoFor(ph[1]) : typeImageFor(tp[1])).then((buf) => {
         if (!buf) return send(res, 404, 'no photo', 'text/plain');
         res.writeHead(200, { ...SECURITY, 'content-type': (buf[0] === 0x89 ? 'image/png' : buf[0] === 0x52 ? 'image/webp' : 'image/jpeg'), 'cache-control': 'max-age=86400' });
         res.end(buf);
@@ -482,6 +555,7 @@ http.createServer((req, res) => {
   routeWorker();
   infoWorker();
   originWorker();
+  typeWorker();
   pollForever();
   console.log(`see-who-fly on http://${HOST}:${PORT}  (look-up ${cfg.lookup_deg}°/${cfg.heads_deg}°, view ${cfg.view_radius_nm} nm, ${LANDMARKS.length} places, log ${passLog.dir || 'off'})`);
 });

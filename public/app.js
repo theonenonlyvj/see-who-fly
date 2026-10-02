@@ -148,10 +148,17 @@ const badPhotos = {};
 // flights): the point is seeing the unusual planes, and a stock 737 shot only takes space.
 const showPhoto = (a) => !a.commonAirliner;
 function setPhoto(el, a) {
-  const src = showPhoto(a) && a.info && a.info.photo;
-  if (!src || badPhotos[src]) { el.className = 'photo'; return; }
+  // The plane's own photo first; else, for anything but an everyday airliner, a labelled photo of its type.
+  const own = showPhoto(a) && a.info && a.info.photo;
+  const type = !own && showPhoto(a) && a.typePhoto;
+  const src = own || (type && type.src);
+  const credit = $(el.id + '-credit');
+  credit.textContent = type ? `${type.title} (type photo, not this plane) · photo: ${type.artist}, ${type.license}, via Wikipedia` : '';
+  if (type && type.source) credit.setAttribute('href', type.source); else credit.removeAttribute('href');
+  credit.className = 'credit' + (type && src && !badPhotos[src] ? ' on' : '');
+  if (!src || badPhotos[src]) { el.className = 'photo'; credit.className = 'credit'; return; }
   if (el.getAttribute('src') !== src) {
-    el.onerror = function () { badPhotos[src] = true; el.className = 'photo'; };
+    el.onerror = function () { badPhotos[src] = true; el.className = 'photo'; credit.className = 'credit'; };
     el.setAttribute('src', src);
   }
   el.className = 'photo on';
