@@ -24,6 +24,9 @@ test('categories: military, airline, cargo, private plus, private, helicopter', 
   assert.equal(classify({ callsign: 'DLH1', type: 'A19N' }), 'airline');        // A319neo is not a helicopter
   assert.equal(classify({ callsign: 'N1234', type: 'B350' }), 'private');       // King Air on a tail number
   assert.equal(classify({ callsign: 'N1234', type: 'R44' }), 'heli');
+  assert.equal(classify({ callsign: 'CNS101', type: 'PC12' }), 'privateplus');  // PlaneSense fractional turboprop
+  assert.equal(classify({ callsign: '', type: 'B738' }), 'airline');            // airliner with no callsign yet
+  assert.equal(classify({ callsign: 'N650EL', type: 'E35L' }), 'privateplus');
   assert.equal(CLASSES.length, 6);
 });
 

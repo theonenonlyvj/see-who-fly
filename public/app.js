@@ -216,10 +216,13 @@ function renderPanel(force) {
   $('s-near').textContent = airborne.length;
   const bc = S.today.byClass || {};
   // Big number = look-ups (planes worth stepping out for); small = everything that passed nearby.
-  $('s-cls').innerHTML = CLS.filter(function (c) { return bc[c[0]] && bc[c[0]].all; }).map(function (c) {
-    const v = bc[c[0]];
-    return `<span>${c[1]} <b>${v.lookup}</b> ${c[2]} <i>of ${v.all}</i></span>`;
-  }).join('') || '<span class="dim">nothing yet today</span>';
+  // The four categories asked for always show (0 is an answer); cargo and helicopter only when seen.
+  // No emoji on the TV: its 2018 browser draws several of them as empty boxes.
+  const tv = document.body.classList.contains('tv');
+  $('s-cls').innerHTML = CLS.filter(function (c) { return c[0] !== 'cargo' && c[0] !== 'heli' || (bc[c[0]] && bc[c[0]].all); }).map(function (c) {
+    const v = bc[c[0]] || { all: 0, lookup: 0 };
+    return `<span>${tv ? '' : c[1] + ' '}<b>${v.lookup}</b> ${c[2]} <i>of ${v.all}</i></span>`;
+  }).join('');
   $('s-types').textContent = Object.entries(S.today.types).sort((a, b) => b[1] - a[1]).map(([t, n]) => `${t}×${n}`).join('  ');
 }
 

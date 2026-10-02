@@ -21,7 +21,7 @@ Have feedback? → **[Tell me here](https://theonenonlyvj.github.io/personal-sit
 - **Mark what you noticed.** Open `/look` on your phone: pick **Desk / Front porch / Back porch**, then tap **Heard / Not heard** and **Seen / Not seen** for each plane. Each is optional, so unmarked never means "no", and "Not seen" means you looked and couldn't spot it. The marks are saved so the thresholds can be tuned to what you actually see and hear.
 - **Overhead today, by type.** Airline, private plus (business jets), private (small planes), cargo, helicopter, military: how many were worth looking up at, out of how many passed nearby.
 - **More about each plane.** A photo when one exists, who owns it, engines and wingspan, and live numbers in plain units (ft above you, mph, climb/descent).
-- **Landing at your airport.** When the route lists don't know a flight, a plane on approach to a local airport is shown as "→ DAL (landing)" (any place in your places file with an `iata` code counts as a local airport).
+- **Landing at your airport.** When the route lists don't know a flight, a plane on approach to a local airport is shown as "→ SXM (landing)" (any place in your places file with an `iata` code counts as a local airport).
 - **Today's stats.** How many planes passed over, the lowest pass, the military count and the type mix. Every pass is saved to a log file, so the stats survive restarts.
 
 No radio or antenna is needed. It uses free, public, crowd-sourced aircraft data ([adsb.lol](https://adsb.lol), [adsb.fi](https://adsb.fi)).
@@ -93,7 +93,7 @@ Keep personal files out of the repo folder; `.gitignore` also blocks the usual n
 | `SEE_WHO_FLY_HOST`, `SEE_WHO_FLY_PORT` | where to serve; use `0.0.0.0` to open it from your phone on home Wi-Fi |
 | `SEE_WHO_FLY_ALLOWED_HOSTS` | extra hostnames to answer to, comma-separated (IP addresses and `localhost` always work) |
 
-> ℹ️ **Lookups:** callsigns and aircraft hex codes for planes in view are sent to adsbdb and the VRS route lists to fetch routes, owners and photos. Every plane in view is looked up the same way, so the pattern doesn't single out your house.
+> ℹ️ **Lookups:** callsigns and aircraft hex codes for planes in view are sent to adsbdb and the VRS route lists (for routes and owners), and photos of the planes shown on screen are fetched from airport-data.com. Like the flight feeds themselves, these services can roughly tell the area you're watching.
 
 > ⚠️ **Keep it on your home network.** Don't port-forward it or put it on the internet. The browser never gets your coordinates (the free flight feeds do see the point you ask about, which is how they work), but the plane positions *relative to you*, combined with public flight data, would give away where you are.
 
