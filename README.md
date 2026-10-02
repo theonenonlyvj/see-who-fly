@@ -1,2 +1,112 @@
-# see-who-fly
-Look at planes fly above your house!
+# see-who-fly ✈️
+
+**A live radar screen of the planes about to fly over your house, with a countdown so you can step outside and look up.**
+
+![see-who-fly showing a 757 overhead and a JetBlue A320 47 seconds out](docs/screenshot.png)
+
+*Demo screenshot at the default example location, Maho Beach, St. Maarten (the famous low-landing beach).*
+
+Have feedback? → **[Tell me here](https://theonenonlyvj.github.io/personal-site/contact)** · More projects → **[theonenonlyvj.github.io/personal-site](https://theonenonlyvj.github.io/personal-site)**
+
+---
+
+## What it does
+
+- **Radar view.** Every aircraft within a few miles of your spot, moving smoothly, with trails.
+- **LOOK UP vs heads-up.** Planes are judged by *how big they'll look* from where you stand (wingspan over 3-D distance), not by a fixed box. A C-17 a mile away counts; a 737 at 35,000 ft never does.
+- **Overhead Now.** A big red card while a plane looks big right above you.
+- **Next Overhead.** A countdown (alert 90 s out, enough time to get outside), plus which way to look ("Look SE, 21° up"), the airline, route, aircraft type and altitude.
+- **"You've flown this plane."** If you give it your [Flighty](https://flighty.com/) export, it tells you when a plane overhead is one you've actually flown on, matched by tail number.
+- **Military flag.** Military aircraft get a blue color and a **MIL** badge.
+- **Mark what you noticed.** Open `/look` on your phone: pick **Desk / Front porch / Back porch**, then tap **Heard / Not heard** and **Seen / Not seen** for each plane. Each is optional, so unmarked never means "no", and "Not seen" means you looked and couldn't spot it. The marks are saved so the thresholds can be tuned to what you actually see and hear.
+- **Today's stats.** How many planes passed over, the lowest pass, the military count and the type mix. Every pass is saved to a log file, so the stats survive restarts.
+
+No radio or antenna is needed. It uses free, public, crowd-sourced aircraft data ([adsb.lol](https://adsb.lol), [adsb.fi](https://adsb.fi)).
+
+## Quick start (about 2 minutes)
+
+You need [Node.js](https://nodejs.org) 18 or newer. There is nothing else to install.
+
+```bash
+git clone https://github.com/theonenonlyvj/see-who-fly.git
+cd see-who-fly
+npm start
+```
+
+Open **http://localhost:8093**. Out of the box it shows the example location (Maho Beach).
+
+### Point it at your house
+
+1. Copy `config.example.json` to somewhere **outside** this folder, for example `~/see-who-fly-home.json`.
+2. Put in your latitude and longitude. To find them, right-click your house in Google Maps and click the numbers.
+3. Start it with that file:
+
+```bash
+SEE_WHO_FLY_HOME_CONFIG=~/see-who-fly-home.json npm start
+```
+
+### Use it from your phone
+
+1. Start it so other devices on your Wi-Fi can reach it:
+
+```bash
+SEE_WHO_FLY_HOST=0.0.0.0 SEE_WHO_FLY_HOME_CONFIG=~/see-who-fly-home.json npm start
+```
+
+2. Find your computer's local IP address. On a Mac, hold Option and click the Wi-Fi icon. On Windows, run `ipconfig`. On Linux, run `hostname -I`. It looks like `192.168.1.23`.
+3. On your phone, open **http://192.168.1.23:8093/look** (with your IP) and add it to your home screen.
+
+<img src="docs/phone.png" alt="The /look phone page: pick your spot, then mark Heard / Seen" width="260">
+
+Passes and marks are saved in `~/.see-who-fly/data` unless you set `SEE_WHO_FLY_DATA_DIR`.
+
+Keep personal files out of the repo folder; `.gitignore` also blocks the usual names. Your location stays on your machine. The browser only receives positions *relative* to home, never your coordinates.
+
+### Settings (in your home config file)
+
+| key | default | meaning |
+|---|---|---|
+| `lat`, `lon` | — | your spot |
+| `tz` | your computer's | time zone for "today" and clocks, e.g. `America/New_York` |
+| `ground_elev_ft` | 0 | your ground elevation in feet above sea level (look it up once; it makes heights and angles accurate) |
+| `view_radius_nm` | 6 | how far the radar shows, in nautical miles |
+| `lookup_deg` | 2.0 | apparent size (degrees) for **LOOK UP** |
+| `heads_deg` | 0.8 | apparent size for **heads-up** (visible but small) |
+| `alert_lead_s` | 90 | how many seconds ahead a plane turns amber |
+| `log_within_mi` | 2 | planes passing closer than this get saved to the log (big ones farther out are saved too) |
+| `feed_radius_nm` | 10 | how far out to ask the feed for planes (wider than the radar, for earlier warnings) |
+
+### Optional extras (environment variables)
+
+| variable | what it does |
+|---|---|
+| `SEE_WHO_FLY_PLACES` | a JSON file of landmarks to draw, e.g. `[{ "name": "Airport", "lat": .., "lon": .. }]` (see `places.example.json`) |
+| `SEE_WHO_FLY_FLIGHTY_DIR` | a folder with your Flighty exports; the newest `FlightyExport-*.csv` is used |
+| `SEE_WHO_FLY_DATA_DIR` | where to save the pass log (`passes-YYYY-MM-DD.jsonl`) and marks (`marks-YYYY-MM-DD.jsonl`); default `~/.see-who-fly/data` |
+| `SEE_WHO_FLY_HOST`, `SEE_WHO_FLY_PORT` | where to serve; use `0.0.0.0` to open it from your phone on home Wi-Fi |
+| `SEE_WHO_FLY_ALLOWED_HOSTS` | extra hostnames to answer to, comma-separated (IP addresses and `localhost` always work) |
+
+> ⚠️ **Keep it on your home network.** Don't port-forward it or put it on the internet. The browser never gets your coordinates (the free flight feeds do see the point you ask about, which is how they work), but the plane positions *relative to you*, combined with public flight data, would give away where you are.
+
+## How it works (short version)
+
+1. The server asks a free aircraft feed for everything within about 10 nm of you, every 2 seconds while a screen is open and every 5 seconds otherwise.
+2. For each plane, it projects heading, speed and climb/descent forward (climb/descent only for a minute; planes about to land are ignored) and works out how big the plane will look at its closest point. That gives a tier (LOOK UP / heads-up / nothing), a countdown to when it starts looking big, and which way to look *at that moment*.
+3. It adds the route ([adsbdb](https://www.adsbdb.com)) and checks the tail number against your Flighty history, locally.
+4. When a plane has gone by, its closest approach is worked out between updates (so a slow poll can't miss it) and saved to the log.
+
+## For agents and contributors
+
+- **No dependencies.** It's plain Node (ESM) and a static `public/` front end (HTML/CSS/canvas, no build step).
+- **Layout:** `server.mjs` handles HTTP, polling and wiring. `lib/geo.mjs` has the local frame and segment closest-approach. `lib/visibility.mjs` has the wingspans, apparent size and tier prediction. `lib/marks.mjs` handles heard/seen marks. `lib/passlog.mjs` has the pass tracker, daily summary and JSONL log. `lib/flighty.mjs` finds the newest export, parses the CSV and matches tail or flight. `lib/places.mjs` loads landmarks and filters them to the window. `public/` holds `index.html`, `app.js` and `style.css`.
+- **Tests:** `npm test` (Node's built-in runner, `test/*.test.mjs`). Add a test for any change to prediction or logging.
+- **API:** `POST /api/mark` `{hex, callsign, spot: desk|front|back, heard: true|false|null, seen: true|false|null}`. `GET /api/state` returns aircraft (relative `x`/`y` metres, tier, ETA, apparent size, marks, route, flown match, military flag), landmarks (relative), today's summary and a `build` id. Open screens reload when `build` changes.
+- **Invariants:** never commit real home coordinates, private places, pass logs or Flighty exports, and never send home lat/lon to the browser. Be polite to the free feeds: keep the poll intervals and the backoff.
+
+## Keywords
+
+`ads-b` · `adsb` · `flight-tracker` · `plane-spotting` · `planespotting` · `aircraft` · `aviation` · `radar` · `overhead` · `flights-over-my-house` · `what-plane-is-that` · `flighty` · `tail-number` · `military-aircraft` · `home-dashboard` · `raspberry-pi` · `real-time` · `nodejs` · `no-dependencies` · `adsb-lol` · `adsb-fi` · `adsbdb`
+
+## Credits
+
+Aircraft positions: [adsb.lol](https://adsb.lol) and [adsb.fi](https://adsb.fi) (community-fed, open data). Routes: [adsbdb](https://www.adsbdb.com). Part of Vijay's VGames side projects. [Feedback welcome](https://theonenonlyvj.github.io/personal-site/contact).

@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>see-who-fly</title>
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/look.css">
+</head>
+<body>
+<main>
+  <section class="scope">
+    <canvas id="radar"></canvas>
+    <div class="scope-hud">
+      <span id="clock">--:--:--</span>
+      <span id="feed" class="dim">connecting…</span>
+    </div>
+  </section>
+
+  <aside>
+    <header>
+      <h1>see<span>·who·</span>fly</h1>
+      <p class="dim" id="boxline"></p>
+    </header>
+
+    <article id="now" class="card idle">
+      <div class="label">OVERHEAD NOW</div>
+      <div class="empty" id="o-last">Nothing overhead.</div>
+      <div class="body">
+        <div class="cs"><span id="o-cs"></span> <span id="o-mil" class="mil">MIL</span></div>
+        <div class="route" id="o-route"></div>
+        <div class="meta" id="o-meta"></div>
+        <div id="o-flown" class="flown"></div>
+        <div id="o-marks"></div>
+      </div>
+    </article>
+
+    <article id="next" class="card idle">
+      <div class="label">NEXT OVERHEAD · <span id="n-tier"></span></div>
+      <div class="empty">Sky's quiet. Nothing worth looking up at yet.</div>
+      <div class="body">
+        <div class="eta"><span id="n-eta">--</span><small>s</small></div>
+        <div class="who">
+          <div class="cs"><span id="n-cs"></span> <span id="n-mil" class="mil">MIL</span></div>
+          <div class="route" id="n-route"></div>
+          <div class="meta" id="n-meta"></div>
+        </div>
+        <div class="look">
+          <svg viewBox="-50 -50 100 100" class="compass">
+            <circle r="44" class="ring"/>
+            <text y="-34" class="cardinal">N</text><text x="36" y="4" class="cardinal">E</text>
+            <text y="42" class="cardinal">S</text><text x="-36" y="4" class="cardinal">W</text>
+            <g id="n-needle"><line y1="0" y2="-38" class="needle"/><circle cy="-38" r="4" class="tip"/></g>
+          </svg>
+          <div id="n-look" class="lookline"></div>
+        </div>
+        <div id="n-flown" class="flown"></div>
+      </div>
+    </article>
+
+    <article class="card">
+      <div class="label">INBOUND</div>
+      <ol id="queue"></ol>
+    </article>
+
+    <article class="card">
+      <div class="label">TODAY OVER THE HOUSE</div>
+      <div class="stats">
+        <div><b id="s-count">0</b><small>look-ups</small></div>
+        <div><b id="s-low">—</b><small>lowest pass</small></div>
+        <div><b id="s-mil">0</b><small>military</small></div>
+        <div><b id="s-near">0</b><small>in view now</small></div>
+      </div>
+      <div id="s-types" class="types dim"></div>
+    </article>
+
+    <footer class="site-footer">
+      Have <a href="https://theonenonlyvj.github.io/personal-site/contact" target="_blank" rel="noopener noreferrer">feedback</a>?
+      See <a href="https://theonenonlyvj.github.io/personal-site" target="_blank" rel="noopener noreferrer">my other projects</a>.
+      · <a href="/look">mark planes →</a>
+    </footer>
+  </aside>
+</main>
+<script src="/marks.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>

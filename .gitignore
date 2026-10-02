@@ -1,0 +1,18 @@
+node_modules/
+dist/
+.DS_Store
+*.local
+*.local.json
+.env
+# Home location never lives in this repo. It is read at runtime from
+# SEE_WHO_FLY_HOME_CONFIG (a path outside the repo).
+home*.json
+data/
+# Private data types, wherever they end up
+*.jsonl
+*.csv
+FlightyExport-*
+places*.json
+!places.example.json
+config*.json
+!config.example.json

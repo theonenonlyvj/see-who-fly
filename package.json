@@ -1,0 +1,39 @@
+{
+  "name": "see-who-fly",
+  "version": "0.3.0",
+  "private": true,
+  "type": "module",
+  "description": "Real-time screen of the aircraft about to pass over one point.",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "ads-b",
+    "adsb",
+    "flight-tracker",
+    "plane-spotting",
+    "planespotting",
+    "aircraft",
+    "aviation",
+    "radar",
+    "overhead",
+    "flighty",
+    "tail-number",
+    "military-aircraft",
+    "home-dashboard",
+    "real-time",
+    "no-dependencies"
+  ],
+  "homepage": "https://github.com/theonenonlyvj/see-who-fly#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/theonenonlyvj/see-who-fly.git"
+  },
+  "bugs": {
+    "url": "https://theonenonlyvj.github.io/personal-site/contact"
+  }
+}
