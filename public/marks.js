@@ -2,7 +2,7 @@
 // yes / no / unmarked. Tapping the active choice clears it back to unmarked.
 window.SWF = window.SWF || {};
 // Everything shown comes from third-party feeds: escape before it touches innerHTML.
-SWF.esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+SWF.esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 SWF.SPOTS = [['desk', 'Desk'], ['front', 'Front porch'], ['back', 'Back porch']];
 SWF.spot = () => localStorage.getItem('swf-spot') || (location.pathname === '/look' ? 'front' : 'desk');
 SWF.setSpot = (s) => localStorage.setItem('swf-spot', s);
@@ -23,16 +23,16 @@ SWF.wireMarks = (root, planesByHex, onChange) => {
     const plane = planesByHex()[hex] || { hex };
     const spot = SWF.spot();
     const cur = (plane.marks && plane.marks[spot]) || { heard: null, seen: null };
-    const next = { heard: cur.heard ?? null, seen: cur.seen ?? null };
+    const next = { heard: cur.heard == null ? null : cur.heard, seen: cur.seen == null ? null : cur.seen };
     next[field] = cur[field] === val ? null : val;
     let r;
     try {
       r = await fetch('/api/mark', { method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ hex, callsign: b.dataset.cs || null, spot, ...next }) });
+        body: JSON.stringify(Object.assign({ hex, callsign: b.dataset.cs || null, spot }, next)) });
     } catch { b.classList.add('err'); return; }
     if (r.ok) {
       const { mark } = await r.json();
-      plane.marks = { ...(plane.marks || {}), [spot]: mark };
+      plane.marks = Object.assign({}, plane.marks || {}, { [spot]: mark });
       onChange && onChange(true);
     }
   });

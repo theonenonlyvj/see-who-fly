@@ -102,11 +102,11 @@ function draw() {
     }
     // Predicted path to the box for inbound traffic.
     if (inbound && a.track != null) {
-      const s = a.gs * KT, th = a.track * Math.PI / 180, T = a.exitS ?? a.etaS;
+      const s = a.gs * KT, th = a.track * Math.PI / 180, T = a.exitS != null ? a.exitS : a.etaS;
       const [ex, ey] = P({ x: p.x + s * Math.sin(th) * T, y: p.y + s * Math.cos(th) * T });
       ctx.setLineDash([4, 5]); ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(ex, ey); ctx.stroke(); ctx.setLineDash([]);
     }
-    ctx.save(); ctx.translate(x, y); ctx.rotate(((a.track ?? 0) * Math.PI) / 180);
+    ctx.save(); ctx.translate(x, y); ctx.rotate(((a.track != null ? a.track : 0) * Math.PI) / 180);
     ctx.fillStyle = col; ctx.beginPath();
     if (a.onGround) ctx.arc(0, 0, 2.5, 0, Math.PI * 2); else { ctx.moveTo(0, -8); ctx.lineTo(5, 6); ctx.lineTo(0, 3); ctx.lineTo(-5, 6); ctx.closePath(); }
     ctx.fill(); ctx.restore();
@@ -121,7 +121,7 @@ requestAnimationFrame(draw);
 
 const fl = (ft) => (ft == null ? '' : ft >= 18000 ? `FL${Math.round(ft / 100)}` : `${Math.round(ft / 100) * 100}′`);
 const mi = (m) => `${(m / M_PER_MI).toFixed(m < M_PER_MI ? 2 : 1)} mi`;
-const routeTxt = (r) => (r && (r.from || r.to) ? `${r.from?.iata || '?'} → ${r.to?.iata || '?'}` : '');
+const routeTxt = (r) => (r && (r.from || r.to) ? `${(r.from && r.from.iata) || '?'} → ${(r.to && r.to.iata) || '?'}` : '');
 
 function renderPanel(force) {
   const age = (performance.now() - fetchedAt) / 1000;
@@ -136,7 +136,7 @@ function renderPanel(force) {
   if (overhead) {
     $('o-cs').textContent = overhead.callsign || overhead.reg || overhead.hex;
     $('o-mil').className = 'mil' + (overhead.mil ? ' on' : '');
-    $('o-route').textContent = [overhead.route?.airline, routeTxt(overhead.route)].filter(Boolean).join(' · ');
+    $('o-route').textContent = [overhead.route && overhead.route.airline, routeTxt(overhead.route)].filter(Boolean).join(' · ');
     $('o-meta').textContent = [overhead.desc || overhead.type, overhead.reg, fl(overhead.altFt), overhead.gs != null ? `${Math.round(overhead.gs)} kt` : ''].filter(Boolean).join(' · ');
     $('o-flown').textContent = flownTxt(overhead.flown);
     byHex[overhead.hex] = overhead;
@@ -157,13 +157,13 @@ function renderPanel(force) {
     $('n-tier').textContent = next.tier === 'lookup' ? 'LOOK UP' : 'heads-up · small';
     $('n-cs').textContent = `${next.callsign || next.reg || next.hex}`;
     $('n-mil').className = 'mil' + (next.mil ? ' on' : '');
-    $('n-route').textContent = [next.route?.airline, routeTxt(next.route)].filter(Boolean).join(' · ');
+    $('n-route').textContent = [next.route && next.route.airline, routeTxt(next.route)].filter(Boolean).join(' · ');
     $('n-meta').textContent = [next.desc || next.type, next.reg, fl(next.altFt), next.gs != null ? `${Math.round(next.gs)} kt` : '',
       next.vrate > 300 ? 'climbing' : next.vrate < -300 ? 'descending' : 'level'].filter(Boolean).join(' · ');
     $('n-needle').setAttribute('transform', `rotate(${next.lookBearing})`);
     $('n-look').innerHTML = next.overheadNow
       ? `<b>Straight up.</b> ${fl(next.altFt)} above you.`
-      : `Look <b>${dir(next.lookBearing)}</b>, <b>${Math.round(next.lookElev ?? 0)}°</b> up.<br><span class="dim">${mi(next.distM)} out${next.track != null ? `, heading ${dir(next.track)}` : ''}</span>`;
+      : `Look <b>${dir(next.lookBearing)}</b>, <b>${Math.round(next.lookElev != null ? next.lookElev : 0)}°</b> up.<br><span class="dim">${mi(next.distM)} out${next.track != null ? `, heading ${dir(next.track)}` : ''}</span>`;
     $('n-flown').textContent = flownTxt(next.flown);
   }
 

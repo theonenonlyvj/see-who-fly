@@ -93,3 +93,20 @@ body.tv .compass { width: 7vw; height: 7vw; }
 body.tv #queue li { font-size: 1.2vw; grid-template-columns: 4vw 1fr auto; }
 body.tv .stats b { font-size: 2.4vw; } body.tv .stats small { font-size: .8vw; }
 body.tv .scope-hud { font-size: 1.1vw; }
+
+/* Old TV browsers (e.g. 2018 Samsung Tizen 4, Chromium ~56) have no CSS grid: fall back to flexbox. */
+@supports not (display: grid) {
+  main { display: flex; }
+  .scope { flex: 1 1 auto; }
+  aside { flex: 0 0 380px; }
+  body.tv aside { flex: 0 0 34vw; }
+  aside > * + * { margin-top: 14px; }
+  #next .body { display: flex; flex-wrap: wrap; align-items: center; }
+  #next .eta { margin-right: 14px; }
+  #next .who { flex: 1 1 50%; }
+  #next .look, #next .flown { flex: 1 1 100%; margin-top: 10px; }
+  .stats { display: flex; justify-content: space-around; }
+  #queue li { display: flex; align-items: baseline; }
+  #queue li > span:nth-child(2) { flex: 1; margin: 0 8px; }
+  .marks { display: flex; } .marks .mk { flex: 1; margin-right: 6px; }
+}
