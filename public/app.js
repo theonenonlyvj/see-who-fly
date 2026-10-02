@@ -1,6 +1,8 @@
 // see-who-fly client: radar + "next overhead" card. Positions are relative to home (x east, y north, metres).
 const $ = (id) => document.getElementById(id);
 const esc = SWF.esc;
+// /tv: big-type, no-mouse layout for a living-room screen.
+if (location.pathname.replace(/\/$/, '') === '/tv') document.body.classList.add('tv');
 const cvs = $('radar'), ctx = cvs.getContext('2d');
 const M_PER_MI = 1609.344, M_PER_NM = 1852, KT = 0.514444;
 const COMPASS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
@@ -55,7 +57,8 @@ function draw() {
   const dt = (performance.now() - fetchedAt) / 1000;
 
   // Range rings (nm) + cardinal ticks.
-  ctx.lineWidth = 1; ctx.font = '11px ui-monospace, monospace';
+  const TV = document.body.classList.contains('tv');
+  ctx.lineWidth = 1; ctx.font = `${TV ? 20 : 11}px ui-monospace, monospace`;
   for (let nm = 1; nm * M_PER_NM <= R + 1; nm++) {
     ctx.strokeStyle = nm % 2 ? '#0f2a26' : '#16403a';
     ctx.beginPath(); ctx.arc(cx, cy, nm * M_PER_NM * k, 0, Math.PI * 2); ctx.stroke();
@@ -66,9 +69,11 @@ function draw() {
 
   // Sweep, for the vibe.
   const sw = ((performance.now() / 4000) % 1) * Math.PI * 2;
-  const g = ctx.createConicGradient(sw - Math.PI / 2, cx, cy);
-  g.addColorStop(0, 'rgba(92,242,176,0.16)'); g.addColorStop(0.08, 'rgba(92,242,176,0)'); g.addColorStop(1, 'rgba(92,242,176,0)');
-  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, R * k, 0, Math.PI * 2); ctx.fill();
+  if (ctx.createConicGradient) { // older TV browsers don't have it; the sweep is decoration
+    const g = ctx.createConicGradient(sw - Math.PI / 2, cx, cy);
+    g.addColorStop(0, 'rgba(92,242,176,0.16)'); g.addColorStop(0.08, 'rgba(92,242,176,0)'); g.addColorStop(1, 'rgba(92,242,176,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, R * k, 0, Math.PI * 2); ctx.fill();
+  }
 
   // Landmarks.
   for (const l of S.landmarks || []) {
@@ -108,7 +113,7 @@ function draw() {
     if (!a.onGround) {
       ctx.fillStyle = col; ctx.fillText(a.callsign || a.reg || a.hex, x + 10, y - 2);
       ctx.fillStyle = '#6c8a83';
-      ctx.fillText(`${a.type || '?'} ${fl(a.altFt)}${a.vrate > 300 ? '↑' : a.vrate < -300 ? '↓' : ''}`, x + 10, y + 11);
+      ctx.fillText(`${a.type || '?'} ${fl(a.altFt)}${a.vrate > 300 ? '↑' : a.vrate < -300 ? '↓' : ''}`, x + 10, y + (TV ? 20 : 11));
     }
   }
 }
@@ -116,7 +121,7 @@ requestAnimationFrame(draw);
 
 const fl = (ft) => (ft == null ? '' : ft >= 18000 ? `FL${Math.round(ft / 100)}` : `${Math.round(ft / 100) * 100}′`);
 const mi = (m) => `${(m / M_PER_MI).toFixed(m < M_PER_MI ? 2 : 1)} mi`;
-const routeTxt = (r) => (r && (r.from || r.to) ? `${r.from?.iata || '?'} → ${r.to?.iata || '?'}${r.unverified ? ' (route?)' : ''}` : '');
+const routeTxt = (r) => (r && (r.from || r.to) ? `${r.from?.iata || '?'} → ${r.to?.iata || '?'}` : '');
 
 function renderPanel(force) {
   const age = (performance.now() - fetchedAt) / 1000;

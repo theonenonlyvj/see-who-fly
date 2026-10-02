@@ -23,6 +23,7 @@ import { parseMark, latestMarks, MarkLog } from './lib/marks.mjs';
 import { loadPlaces, placesInView } from './lib/places.mjs';
 import { newestExport, loadFlighty, flownMatch } from './lib/flighty.mjs';
 import { PassTracker, PassLog, summarize } from './lib/passlog.mjs';
+import { chainFromVrs, pickLeg } from './lib/routes.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const BUILD = String(Date.now()); // changes on every restart; open screens reload themselves
@@ -90,16 +91,19 @@ function describe(ac, now) {
     peakDeg: look.peakDeg ?? null, nowDeg: look.nowDeg ?? null, slantM: look.slantM ?? null,
     lookBearing: look.lookBearing ?? bearing, lookElev: look.lookElev ?? elevation,
     flown: flownMatch(flighty, clean(ac.r), callsign),
-    route: plausibleRoute(routeCache.get(callsign)?.v, altFt),
+    route: routeFor(callsign, { x: p.x, y: p.y, altFt, vrate, track: ac.track ?? null }),
     t: now,
   };
 }
 
-function plausibleRoute(r, altFt) {
-  if (!r) return null;
-  const local = [r.from, r.to].some((a) => a && a.km < 60);
-  const pub = (a) => a && { iata: a.iata, name: a.name };
-  return { airline: r.airline, from: pub(r.from), to: pub(r.to), unverified: altFt != null && altFt < 10000 && !local };
+// Route = the leg of this flight number that fits what the plane is doing (lib/routes.mjs), or the
+// airline alone when no leg fits. Never a guessed route.
+function routeFor(callsign, st) {
+  const c = routeCache.get(callsign)?.v;
+  if (!c) return null;
+  const l = pickLeg(c.chain, st);
+  if (!l && !c.airline) return null;
+  return { airline: c.airline, ...(l || {}) };
 }
 
 // ---------- Flighty history (local only; newest export wins) ----------
@@ -114,23 +118,49 @@ function refreshFlighty() {
   } catch (e) { console.error('flighty load failed', e.message); }
 }
 
-// ---------- route enrichment (adsbdb, cached) ----------
-const routeCache = new Map(); // callsign -> { v, at }
+// ---------- route enrichment (cached) ----------
+// Legs: VRS standing data (multi-leg chains, vrs-standing-data.adsb.lol). Airline name, and a one-leg
+// fallback when VRS has nothing: adsbdb. Either way the leg must fit the plane's state to be shown.
+const routeCache = new Map(); // callsign -> { v: { airline, chain }, at, ttl }
+const routeInFlight = new Set();
+const ROUTE_TTL_MS = 6 * 3600_000, ROUTE_RETRY_MS = 5 * 60_000;
 const routeQueue = new Set();
+const cleanAirport = (a) => ({ ...a, iata: clean(a.iata, 4) || '?', name: cleanText(a.name) });
+async function getJson(url) {
+  const r = await fetch(url, { signal: AbortSignal.timeout(6000), headers: { 'user-agent': 'see-who-fly/0.4' } });
+  if (r.status === 404) return null;                 // genuinely not listed
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);    // try again later
+  return r.json();
+}
 async function routeWorker() {
   for (;;) {
     const cs = routeQueue.values().next().value;
     if (!cs) { await sleep(500); continue; }
     routeQueue.delete(cs);
+    const c = routeCache.get(cs);
+    if (routeInFlight.has(cs) || (c && Date.now() - c.at < c.ttl)) continue;
+    routeInFlight.add(cs);
+    let chain = [], airline = null, failed = false;
     try {
-      const r = await fetch(`https://api.adsbdb.com/v0/callsign/${encodeURIComponent(cs)}`, { signal: AbortSignal.timeout(6000) });
-      const j = await r.json();
-      const fr = j?.response?.flightroute;
-      // km (distance from home) is used server-side for the plausibility check only and never sent out.
-      const ap = (a) => a ? { iata: clean(a.iata_code, 4), name: cleanText(a.municipality), km: Math.hypot(...Object.values(toLocal(a.latitude, a.longitude))) / 1000 } : null;
-      routeCache.set(cs, { at: Date.now(), v: fr ? { airline: cleanText(fr.airline?.name), from: ap(fr.origin), to: ap(fr.destination) } : null });
-    } catch { routeCache.set(cs, { at: Date.now(), v: null }); }
-    await sleep(400); // be polite to a free service
+      // Registrations (N123AB) are never in route lists; skip the lookup.
+      if (!/^N\d/.test(cs)) {
+        const vrs = await getJson(`https://vrs-standing-data.adsb.lol/routes/${cs.slice(0, 2)}/${cs}.json`);
+        chain = chainFromVrs(vrs, frame);
+      }
+    } catch { failed = true; }
+    try {
+      const fr = (await getJson(`https://api.adsbdb.com/v0/callsign/${encodeURIComponent(cs)}`))?.response?.flightroute;
+      airline = cleanText(fr?.airline?.name);
+      if (chain.length < 2 && fr?.origin && fr?.destination) {
+        const ap = (a) => ({ iata: a.iata_code, location: a.municipality, lat: a.latitude, lon: a.longitude });
+        chain = chainFromVrs({ _airports: [ap(fr.origin), ap(fr.destination)] }, frame);
+      }
+    } catch { failed = true; }
+    // A network failure is retried in minutes; a real "unknown" is kept for hours.
+    routeCache.set(cs, { at: Date.now(), ttl: failed ? ROUTE_RETRY_MS : ROUTE_TTL_MS,
+      v: chain.length || airline ? { airline, chain: chain.map(cleanAirport) } : null });
+    routeInFlight.delete(cs);
+    await sleep(400); // be polite to free services
   }
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -171,7 +201,7 @@ async function pollOnce() {
   const feed = FEEDS[i], fst = feedState[i];
   let j;
   try {
-    const r = await fetch(feed.url, { signal: AbortSignal.timeout(8000), headers: { 'user-agent': 'see-who-fly/0.3' } });
+    const r = await fetch(feed.url, { signal: AbortSignal.timeout(8000), headers: { 'user-agent': 'see-who-fly/0.4' } });
     if (!r.ok) throw new Error(`${feed.name} HTTP ${r.status}`);
     j = await r.json();
     fst.fails = 0;
@@ -183,7 +213,7 @@ async function pollOnce() {
   for (const a of list) {
     if (a.callsign && !a.onGround) {
       const c = routeCache.get(a.callsign);
-      if (!c || now - c.at > 6 * 3600_000) routeQueue.add(a.callsign);
+      if (!c || now - c.at > c.ttl) routeQueue.add(a.callsign);
     }
   }
   recordPasses(tracker.update(list, now));
@@ -251,7 +281,7 @@ function handleState(res) {
   lastViewer = Date.now();
   const stale = !state.updated || Date.now() - state.updated > STALE_MS;
   const live = stale ? [] : state.aircraft;
-  for (const a of live) a.route = plausibleRoute(routeCache.get(a.callsign)?.v, a.altFt) || a.route;
+  for (const a of live) a.route = routeFor(a.callsign, a);
   const sum = summarize(today.passes);
   const marks = latestMarks(today.marks);
   const withMarks = (o) => ({ ...o, marks: marks.get(o.hex) || null });
@@ -272,7 +302,7 @@ function handleState(res) {
 }
 
 function handleStatic(url, res, method) {
-  const page = url.pathname === '/' ? 'index.html' : url.pathname === '/look' ? 'look.html' : url.pathname.replace(/^\/+/, '');
+  const page = url.pathname === '/' || url.pathname === '/tv' || url.pathname === '/tv/' ? 'index.html' : url.pathname === '/look' ? 'look.html' : url.pathname.replace(/^\/+/, '');
   const file = path.resolve(PUBLIC_DIR, page);
   let st = null;
   try { st = fs.statSync(file); } catch {}

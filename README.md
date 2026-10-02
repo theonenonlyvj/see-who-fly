@@ -45,6 +45,10 @@ Open **http://localhost:8093**. Out of the box it shows the example location (Ma
 SEE_WHO_FLY_HOME_CONFIG=~/see-who-fly-home.json npm start
 ```
 
+### Put it on a TV
+
+Open **http://YOUR-COMPUTER-IP:8093/tv** in the TV's web browser (start the server with `SEE_WHO_FLY_HOST=0.0.0.0` as below). `/tv` is a big-type, no-buttons layout. It needs a reasonably recent browser (on Samsung TVs, roughly 2022 models or newer). Turn off the TV's auto power-off if you want it on all day, and mind burn-in on OLED screens.
+
 ### Use it from your phone
 
 1. Start it so other devices on your Wi-Fi can reach it:
@@ -92,7 +96,7 @@ Keep personal files out of the repo folder; `.gitignore` also blocks the usual n
 
 1. The server asks a free aircraft feed for everything within about 10 nm of you, every 2 seconds while a screen is open and every 5 seconds otherwise.
 2. For each plane, it projects heading, speed and climb/descent forward (climb/descent only for a minute; planes about to land are ignored) and works out how big the plane will look at its closest point. That gives a tier (LOOK UP / heads-up / nothing), a countdown to when it starts looking big, and which way to look *at that moment*.
-3. It adds the route ([adsbdb](https://www.adsbdb.com)) and checks the tail number against your Flighty history, locally.
+3. It looks up the flight number's route list ([VRS standing data](https://github.com/vradarserver/standing-data) via adsb.lol, with [adsbdb](https://www.adsbdb.com) for the airline name and as a fallback). Airlines reuse a flight number for several legs a day, so it shows only the leg that fits what the plane is doing (landing here, taking off here, or cruising along that leg's path), and just the airline when nothing fits. These are community route lists, not live flight plans. It also checks the tail number against your Flighty history, locally.
 4. When a plane has gone by, its closest approach is worked out between updates (so a slow poll can't miss it) and saved to the log.
 
 ## For agents and contributors
@@ -109,4 +113,4 @@ Keep personal files out of the repo folder; `.gitignore` also blocks the usual n
 
 ## Credits
 
-Aircraft positions: [adsb.lol](https://adsb.lol) and [adsb.fi](https://adsb.fi) (community-fed, open data). Routes: [adsbdb](https://www.adsbdb.com). Part of Vijay's VGames side projects. [Feedback welcome](https://theonenonlyvj.github.io/personal-site/contact).
+Aircraft positions: [adsb.lol](https://adsb.lol) and [adsb.fi](https://adsb.fi) (community-fed, open data). Routes: [VRS standing data](https://github.com/vradarserver/standing-data) (mirrored by adsb.lol) and [adsbdb](https://www.adsbdb.com). Part of Vijay's VGames side projects. [Feedback welcome](https://theonenonlyvj.github.io/personal-site/contact).

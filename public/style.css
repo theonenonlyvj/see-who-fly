@@ -77,3 +77,19 @@ header p { margin: 4px 0 0; font-size: 11px; }
 
 .site-footer { margin-top: auto; padding-top: 8px; font-size: 11px; color: var(--dim); text-align: center; }
 .site-footer a { color: var(--phos); }
+
+/* /tv: living-room screen. Bigger type, no buttons, no cursor. */
+body.tv { cursor: none; }
+body.tv main { grid-template-columns: 1fr 34vw; }
+body.tv aside { padding: 2.2vw; gap: 1.4vw; font-size: 1.6vw; }
+body.tv header h1 { font-size: 3vw; }
+body.tv header p, body.tv .site-footer, body.tv #o-marks, body.tv .label { font-size: 1vw; }
+body.tv .site-footer, body.tv #o-marks { display: none; }
+body.tv #now .cs { font-size: 3.4vw; }
+body.tv .cs { font-size: 2.4vw; }
+body.tv .eta { font-size: 6vw; }
+body.tv .route, body.tv .meta, body.tv .lookline, body.tv .flown { font-size: 1.3vw; }
+body.tv .compass { width: 7vw; height: 7vw; }
+body.tv #queue li { font-size: 1.2vw; grid-template-columns: 4vw 1fr auto; }
+body.tv .stats b { font-size: 2.4vw; } body.tv .stats small { font-size: .8vw; }
+body.tv .scope-hud { font-size: 1.1vw; }
