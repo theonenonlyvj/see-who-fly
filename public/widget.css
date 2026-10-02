@@ -1,0 +1,18 @@
+/* /widget: one plane at a time, sized to whatever box it's put in (dashboard tile, iframe). */
+body.widgetpage { margin: 0; height: 100vh; overflow: hidden; background: var(--bg); }
+.w { box-sizing: border-box; height: 100vh; padding: 5vmin 6vmin; border: 2px solid var(--line); border-radius: 3vmin; color: var(--ink); font-family: var(--mono); display: flex; flex-direction: column; justify-content: center; }
+.w .wl { font-size: 5vmin; letter-spacing: .2em; color: var(--dim); }
+.w .big { font-size: 22vmin; line-height: 1; color: var(--amber); font-variant-numeric: tabular-nums; }
+.w .cs { font-size: 12vmin; line-height: 1.1; margin-top: 1vmin; }
+.w .sub { font-size: 5vmin; color: var(--phos); margin-top: 1vmin; }
+.w .meta { font-size: 4.5vmin; color: var(--dim); margin-top: 1vmin; }
+.w .lookw { font-size: 6vmin; margin-top: 2vmin; }
+.w .lookw b { color: var(--amber); }
+.w .foot { font-size: 4vmin; color: var(--dim); margin-top: 2.5vmin; }
+.w.now { border-color: var(--red); }
+.w.now .wl, .w.now .cs { color: var(--red); }
+.w.next { border-color: var(--amber); }
+.w.passed .cs { color: var(--dim); }
+.w .counts { font-size: 5vmin; line-height: 1.6; margin-top: 2vmin; }
+.w .counts b { color: var(--phos); }
+.w .counts i { color: var(--amber); font-style: normal; font-size: 4vmin; }

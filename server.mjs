@@ -2,7 +2,7 @@
 // No dependencies. Node 18+ (global fetch).
 //
 // Personal data never lives in this repo:
-//   SEE_WHO_FLY_HOME_CONFIG   path to { lat, lon, tz, ground_elev_ft, view_radius_nm, alert_lead_s, overhead_hold_s, lookup_deg, heads_deg }
+//   SEE_WHO_FLY_HOME_CONFIG   path to { lat, lon, tz, ground_elev_ft, view_radius_nm, alert_lead_s, overhead_hold_s, lookup_deg, heads_deg, up_deg }
 //   SEE_WHO_FLY_PLACES        optional path to private reference points [{ name, lat, lon }]
 //   SEE_WHO_FLY_FLIGHTY_DIR   optional dir of Flighty exports; the newest FlightyExport-*.csv is used and re-checked hourly
 //   SEE_WHO_FLY_FLIGHTY_CSV   optional single export (used if no dir is given)
@@ -360,6 +360,32 @@ fs.mkdirSync(DATA_DIR, { recursive: true });
 const passLog = new PassLog(DATA_DIR, dayKey);
 const tracker = new PassTracker({ logWithinM: cfg.log_within_mi * M_PER_MI, closeAfterS: 30, groundFt: cfg.ground_elev_ft, lookupDeg: cfg.lookup_deg, headsDeg: cfg.heads_deg });
 const markLog = new MarkLog(DATA_DIR, dayKey);
+
+// ---------- settings (one set for every screen; changed from the unlinked /settings page) ----------
+// view: 'north' (true north up) or 'house' (cfg.up_deg up: the way the front door faces).
+const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
+const settings = { view: 'north' };
+try { const v = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8')).view; if (v === 'north' || v === 'house') settings.view = v; } catch {}
+const settingsBudget = { windowStart: 0, byIp: new Map() };
+function handleSettings(req, res) {
+  const origin = req.headers.origin;
+  if (origin && origin.replace(/^https?:\/\//, '') !== req.headers.host) return send(res, 403, '{"ok":false}');
+  let body = '';
+  req.on('data', (c) => { body += c; if (body.length > 500) req.destroy(); });
+  req.on('end', () => {
+    // Per device, so one device spamming can't lock the others out.
+    const now = Date.now(), ip = req.socket.remoteAddress || '?';
+    if (now - settingsBudget.windowStart > 60_000) { settingsBudget.windowStart = now; settingsBudget.byIp = new Map(); }
+    const n = (settingsBudget.byIp.get(ip) || 0) + 1; settingsBudget.byIp.set(ip, n);
+    if (n > 30 || settingsBudget.byIp.size > 200) return send(res, 429, '{"ok":false}');
+    let v = null;
+    try { v = JSON.parse(body).view; } catch {}
+    if (v !== 'north' && v !== 'house') return send(res, 400, '{"ok":false}');
+    settings.view = v;
+    try { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings)); } catch (e) { console.error('settings save failed', e.message); }
+    send(res, 200, JSON.stringify({ ok: true, settings }));
+  });
+}
 const today = { day: dayKey(), passes: [], marks: [] };
 today.passes = passLog.read(today.day);
 today.marks = markLog.read(today.day);
@@ -500,7 +526,9 @@ function handleState(res) {
     stale,
     build: BUILD,
     // The client gets thresholds and relative positions; it never needs the home coordinates.
-    config: { viewRadiusM: VIEW_RADIUS_M, alertLeadS: cfg.alert_lead_s, holdS: cfg.overhead_hold_s, nearM: cfg.near_mi * M_PER_MI, lookupDeg: cfg.lookup_deg, headsDeg: cfg.heads_deg, tz: cfg.tz },
+    settings,
+    // upDeg is only the way the front door faces (for house view), not a location.
+    config: { upDeg: Number.isFinite(cfg.up_deg) ? cfg.up_deg : null, viewRadiusM: VIEW_RADIUS_M, alertLeadS: cfg.alert_lead_s, holdS: cfg.overhead_hold_s, nearM: cfg.near_mi * M_PER_MI, lookupDeg: cfg.lookup_deg, headsDeg: cfg.heads_deg, tz: cfg.tz },
     aircraft: live.map(withMarks),
     recent,
     landmarks: LANDMARKS,
@@ -516,13 +544,16 @@ const oldBrowser = (ua = '') => /Tizen|Web0S|SMART-TV|SmartTV/i.test(ua)
 function handleStatic(url, res, method, ua) {
   const p = url.pathname.replace(/\/$/, '') || '/';
   const old = oldBrowser(ua);
+  const PAGES = { '/look': 'look', '/widget': 'widget', '/settings': 'settings' };
   const page = p === '/favicon.ico' ? 'favicon-32.png' : p === '/tv' || (p === '/' && old) ? 'tv.html' : p === '/' ? 'index.html'
-    : p === '/look' ? (old ? 'tv-look.html' : 'look.html') : url.pathname.replace(/^\/+/, '');
+    : PAGES[p] ? (old ? `tv-${PAGES[p]}.html` : `${PAGES[p]}.html`) : url.pathname.replace(/^\/+/, '');
   const file = path.resolve(PUBLIC_DIR, page);
   let st = null;
   try { st = fs.statSync(file); } catch {}
   if (!file.startsWith(PUBLIC_DIR) || !st || !st.isFile()) return send(res, 404, 'not found', 'text/plain');
-  res.writeHead(200, { ...SECURITY, 'content-type': MIME[path.extname(file)] || 'application/octet-stream', 'cache-control': 'no-cache', vary: 'user-agent' });
+  // The widget may be embedded in the household dashboard (an iframe on another local origin); it has no buttons.
+  const csp = /(^|-)widget\.html$/.test(page) ? { 'content-security-policy': "default-src 'self'; img-src 'self' data:" } : {};
+  res.writeHead(200, { ...SECURITY, ...csp, 'content-type': MIME[path.extname(file)] || 'application/octet-stream', 'cache-control': 'no-cache', vary: 'user-agent' });
   if (method === 'HEAD') return res.end();
   fs.createReadStream(file).on('error', () => res.destroy()).pipe(res);
 }
@@ -533,6 +564,7 @@ http.createServer((req, res) => {
     let url;
     try { url = new URL(req.url, 'http://localhost'); } catch { return send(res, 400, 'bad request', 'text/plain'); }
     if (url.pathname === '/api/mark' && req.method === 'POST') return handleMark(req, res);
+    if (url.pathname === '/api/settings' && req.method === 'POST') return handleSettings(req, res);
     if (url.pathname === '/api/state') return handleState(res);
     const ph = /^\/photo\/(~?[0-9a-f]{6})$/.exec(url.pathname);
     const tp = /^\/typephoto\/([0-9a-f]{12})$/.exec(url.pathname);

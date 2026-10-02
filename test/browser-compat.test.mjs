@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
-import { tvHeader, tvHtml, tvLookHtml, TV_SOURCES } from '../scripts/tv-common.mjs';
+import { tvHeader, tvPage, TV_SOURCES, TV_PAGES } from '../scripts/tv-common.mjs';
 
 // The living-room TV this was built for is a 2018 Samsung (Tizen 4, ~Chromium 56). Its parser
 // rejects these, and one syntax error blanks the whole page. The main page is modern JavaScript;
@@ -28,12 +28,11 @@ test('the /tv build is up to date with its source (run npm run build:tv)', () =>
   for (const f of TV_SOURCES) {
     assert.equal(fs.readFileSync(`public/tv/${f}`, 'utf8').split('\n')[0] + '\n', tvHeader(f), `public/tv/${f} is stale`);
   }
-  assert.equal(fs.readFileSync('public/tv.html', 'utf8'), tvHtml(), 'public/tv.html is stale');
-  assert.equal(fs.readFileSync('public/tv-look.html', 'utf8'), tvLookHtml(), 'public/tv-look.html is stale');
+  for (const [src, out] of TV_PAGES) assert.equal(fs.readFileSync(`public/${out}`, 'utf8'), tvPage(src), `public/${out} is stale`);
   // The TV pages must load only the lowered scripts (a changed <script> tag would slip past the rewrite).
-  for (const [f, want] of [['public/tv.html', ['/tv/marks.js', '/tv/app.js']], ['public/tv-look.html', ['/tv/marks.js', '/tv/look.js']]]) {
-    const srcs = [...fs.readFileSync(f, 'utf8').matchAll(/<script[^>]*src="([^"]+)"/g)].map((m) => m[1]);
-    assert.deepEqual(srcs, want, f);
+  for (const [, out] of TV_PAGES) {
+    const srcs = [...fs.readFileSync(`public/${out}`, 'utf8').matchAll(/<script[^>]*src="([^"]+)"/g)].map((m) => m[1]);
+    assert.ok(srcs.length && srcs.every((x) => x.startsWith('/tv/')), `public/${out}: ${srcs}`);
   }
 });
 

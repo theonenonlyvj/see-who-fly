@@ -1,6 +1,4 @@
 // Phone page: pick where you are, then mark the plane(s) worth looking at. Big buttons, nothing else.
-const COMPASS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
-const dir = (b) => COMPASS[Math.round(b / 22.5) % 16];
 const esc = SWF.esc;
 const fl = (ft) => (ft == null ? '' : `${Math.round(ft / 100) * 100} ft`);
 let S = null, build = null, fetchedAt = 0;
@@ -23,7 +21,7 @@ function card(p, kind) {
   const when = kind === 'now' ? 'OVERHEAD NOW' : kind === 'now passed' ? `JUST PASSED · ${Math.round(p.justPassedS + age)}s ago` : kind === 'near' ? `NEARBY · ${(p.distM / 1609.344).toFixed(1)} mi` : kind === 'soon' ? `IN ${Math.max(0, Math.round(p.etaS - age))}s` : SWF.time(p.at, S.config.tz);
   const end = (e) => (e && typeof e === 'object' ? e.iata : e) || '?';
   const route = !p.route ? '' : p.route.inferred === 'landing' ? ` · ${p.route.from ? end(p.route.from) + ' ' : ''}→ ${end(p.route.to)} (landing)` : p.route.inferred === 'origin' ? ` · from ${end(p.route.from)}` : p.route.inferred === 'departing' ? ` · ${end(p.route.from)} → (departing)` : (p.route.from || p.route.to) ? ` · ${end(p.route.from)}→${end(p.route.to)}` : '';
-  const dirn = kind === 'soon' ? `<div class="dirn">Look <b>${dir(p.lookBearing != null ? p.lookBearing : p.bearing)}</b>, ${Math.round(p.lookElev != null ? p.lookElev : (p.elevation != null ? p.elevation : 0))}° up</div>` : '';
+  const dirn = kind === 'soon' ? `<div class="dirn">Look <b>${SWF.where(S, p.lookBearing != null ? p.lookBearing : p.bearing)}</b>, ${Math.round(p.lookElev != null ? p.lookElev : (p.elevation != null ? p.elevation : 0))}° up</div>` : '';
   return `<div class="lk ${kind}"><div class="when">${when}${p.tier === 'heads' ? ' · small' : ''}</div>
     <div class="cs">${esc(p.callsign || p.reg || p.hex)}${p.mil ? ' <span class="mil on">MIL</span>' : ''}</div>
     <div class="meta">${esc(p.type || '?')} · ${fl(p.altFt)}${esc(route)}</div>${dirn}${SWF.markRow(p)}</div>`;

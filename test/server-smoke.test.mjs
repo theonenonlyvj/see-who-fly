@@ -20,7 +20,16 @@ test('server starts and serves /api/state and the pages', async () => {
       try { ok = (await fetch(`http://127.0.0.1:${port}/api/state`)).status === 200; } catch {}
     }
     assert.ok(ok, `server did not come up: ${err}`);
-    for (const p of ['/', '/tv', '/look']) assert.equal((await fetch(`http://127.0.0.1:${port}${p}`)).status, 200, p);
+    for (const p of ['/', '/tv', '/look', '/widget', '/settings']) assert.equal((await fetch(`http://127.0.0.1:${port}${p}`)).status, 200, p);
+    const old = { 'user-agent': 'Mozilla/5.0 (SMART-TV; Linux; Tizen 4.0) AppleWebKit/537.36 Chrome/56.0.2924.0 TV Safari/537.36' };
+    assert.match(await (await fetch(`http://127.0.0.1:${port}/widget`, { headers: old })).text(), /\/tv\/widget\.js/);
+    assert.doesNotMatch((await fetch(`http://127.0.0.1:${port}/widget`)).headers.get('content-security-policy'), /frame-ancestors/); // embeddable
+    assert.match((await fetch(`http://127.0.0.1:${port}/`)).headers.get('content-security-policy'), /frame-ancestors 'none'/);
+    const post = (body, headers = {}) => fetch(`http://127.0.0.1:${port}/api/settings`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body });
+    assert.equal((await post('{"view":"house"}')).status, 200);
+    assert.equal((await (await fetch(`http://127.0.0.1:${port}/api/state`)).json()).settings.view, 'house');
+    assert.equal((await post('{"view":"sideways"}')).status, 400);
+    assert.equal((await post('{"view":"north"}', { origin: 'http://evil.example' })).status, 403);
     assert.equal((await fetch(`http://127.0.0.1:${port}/photo/zzzzzz`)).status, 404);
     for (const [p, type] of [['/favicon.svg', 'image/svg+xml'], ['/favicon.ico', 'image/png'], ['/apple-touch-icon.png', 'image/png']]) {
       const r = await fetch(`http://127.0.0.1:${port}${p}`);

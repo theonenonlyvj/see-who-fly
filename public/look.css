@@ -21,3 +21,4 @@ body.lookpage { padding: 14px 14px 30px; max-width: 520px; margin: 0 auto; heigh
 #now .mk { padding: 6px 2px; font-size: 11px; }
 .lk.now.passed { border-color: var(--dim); box-shadow: none; }
 .lk.now.passed .when { color: var(--dim); }
+.settings-h { font: 600 14px var(--mono); letter-spacing: .15em; color: var(--dim); margin: 6px 0 10px; text-transform: uppercase; }

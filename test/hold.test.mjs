@@ -68,3 +68,21 @@ test('a heads-up-size pass (visible, not LOOK UP) is held too, so a plane you he
   assert.equal(h.apply([{ hex: 'j', overheadNow: false, nowDeg: 0.3 }], 20_000)[0].justPassedS, 18);
   assert.equal(h.apply([{ hex: 'k', overheadNow: false, nowDeg: 0.05 }], 20_000)[0].justPassedS, null); // a dot at FL420
 });
+
+test('passedLookup: a held plane that looked big (LOOK UP) vs one that was only visible', () => {
+  const h = new OverheadHold({ holdS: 90, headsDeg: 0.8 });
+  h.apply([{ hex: 'big', overheadNow: true, nowDeg: 3 }, { hex: 'small', overheadNow: false, nowDeg: 1.2 }], 0);
+  const l = h.apply([{ hex: 'big', overheadNow: false, nowDeg: 0.5 }, { hex: 'small', overheadNow: false, nowDeg: 0.3 }], 10_000);
+  assert.equal(l[0].passedLookup, true);
+  assert.equal(l[1].passedLookup, false);
+});
+
+test('sinceLookupS counts from when it stopped looking big, even while it is still visible', () => {
+  const h = new OverheadHold({ holdS: 90, headsDeg: 0.8 });
+  h.apply([{ hex: 'a', overheadNow: true, nowDeg: 3 }], 0);
+  let l = h.apply([{ hex: 'a', overheadNow: false, nowDeg: 1.5 }], 20_000);      // still visible: justPassedS resets
+  assert.equal(l[0].justPassedS, 0);
+  assert.equal(l[0].sinceLookupS, 20);
+  l = h.apply([{ hex: 'a', overheadNow: false, nowDeg: 0.5 }], 100_000);
+  assert.equal(l[0].sinceLookupS, 100);                                              // kept past holdS for the widget's 90 s rule
+});

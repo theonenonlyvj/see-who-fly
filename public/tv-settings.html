@@ -3,8 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<title>see-who-fly · look</title>
+<title>see-who-fly · settings</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -13,11 +12,14 @@
 <link rel="stylesheet" href="/look.css">
 </head>
 <body class="lookpage">
-  <div class="spots" id="spots"></div>
-  <div id="cards"></div>
-  <p class="foot"><a href="/">radar</a> · <a href="https://theonenonlyvj.github.io/personal-site/contact" target="_blank" rel="noopener noreferrer">feedback</a></p>
-<script src="/tv/marks.js"></script>
+  <h2 class="settings-h">Radar view</h2>
+  <div class="spots" id="view">
+    <button data-view="north">True north up</button>
+    <button data-view="house">House view</button>
+  </div>
+  <p class="foot" id="note">Applies to every screen.</p>
+  <p class="foot"><a href="/">radar</a> · <a href="/widget">widget</a> · <a href="/look">mark planes</a></p>
 <script src="/tv/view.js"></script>
-<script src="/tv/look.js"></script>
+<script src="/tv/settings.js"></script>
 </body>
 </html>

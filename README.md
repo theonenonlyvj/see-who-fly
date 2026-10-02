@@ -23,6 +23,8 @@ Have feedback? → **[Tell me here](https://theonenonlyvj.github.io/personal-sit
 - **More about each plane.** A photo of the plane when one exists, else a labelled photo of its type from Wikipedia with the photographer's credit (none for everyday airliners: the photos are for the unusual planes), who owns it, engines and wingspan, and live numbers in plain units (ft above you, mph, climb/descent).
 - **Landing at your airport.** When the route lists don't know a flight, a plane on approach to a local airport is shown as "→ SXM (landing)" (any place in your places file with an `iata` code counts as a local airport).
 - **Where it took off from.** For planes no route list knows (private jets, charters), the plane's own public track for the day shows where its current leg began, e.g. "TUL → SXM (landing)" or "from TUL". No answer if the track starts mid-air or isn't next to an airport.
+- **House view.** Open `/settings` (deliberately not linked from the screen; bookmark it) to turn the radar so the way your front door faces is at the top. Directions then read like your house ("Look front-left, 26° up"); the compass and an N on the radar rim still show true north. The setting is saved on the server, so it applies to every screen. Needs `up_deg` in your home config.
+- **Widget.** `/widget` shows one plane at a time for a dashboard tile: overhead from 15 s before to 10 s after; a plane that just passed until 30 s after unless the next is under 60 s out; otherwise the next look-up; then clear sky with today's counts. It can be embedded in an iframe.
 - **Today's stats.** How many planes passed over, the lowest pass, the military count and the type mix. Every pass is saved to a log file, so the stats survive restarts.
 
 No radio or antenna is needed. It uses free, public, crowd-sourced aircraft data ([adsb.lol](https://adsb.lol), [adsb.fi](https://adsb.fi)).
@@ -82,6 +84,7 @@ Keep personal files out of the repo folder; `.gitignore` also blocks the usual n
 | `heads_deg` | 0.8 | apparent size for **heads-up** (visible but small) |
 | `alert_lead_s` | 90 | how many seconds ahead a plane turns amber |
 | `overhead_hold_s` | 90 | how long a plane stays on the Overhead Now card (as "just passed") after it stops looking big |
+| `up_deg` | — | the compass bearing your front door faces; enables House view in `/settings` |
 | `near_mi` | 2 | planes within this distance are listed as "Nearby" on `/look` for marking |
 | `log_within_mi` | 2 | planes passing closer than this get saved to the log (big ones farther out are saved too) |
 | `feed_radius_nm` | 10 | how far out to ask the feed for planes (wider than the radar, for earlier warnings) |

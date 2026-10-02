@@ -3,8 +3,6 @@ const $ = (id) => document.getElementById(id);
 const esc = SWF.esc;
 const cvs = $('radar'), ctx = cvs.getContext('2d');
 const M_PER_MI = 1609.344, M_PER_NM = 1852, KT = 0.514444;
-const COMPASS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
-const dir = (b) => COMPASS[Math.round(b / 22.5) % 16];
 
 let S = null, fetchedAt = 0;
 const byHex = {};
@@ -51,7 +49,9 @@ function draw() {
   ctx.clearRect(0, 0, w, h);
   if (!S) return;
   const R = S.config.viewRadiusM, k = (Math.min(w, h) / 2 * 0.94) / R;
-  const P = (p) => [cx + p.x * k, cy - p.y * k];
+  // House view (from /settings) turns everything so the front door's direction points up.
+  const up = SWF.upDeg(S);
+  const P = (p) => { const q = SWF.rotate(p, up); return [cx + q.x * k, cy - q.y * k]; };
   const dt = (performance.now() - fetchedAt) / 1000;
 
   // Range rings (nm) + cardinal ticks.
@@ -79,6 +79,15 @@ function draw() {
     ctx.fillRect(x - 2, y - 2, 4, 4); ctx.fillText(l.name, x + 6, y + 4);
   }
 
+  // House view: mark true north on the rim, and which way is the front.
+  if (up) {
+    const [nx, ny] = P({ x: 0, y: R * 0.97 });
+    ctx.fillStyle = '#ffb547'; ctx.textAlign = 'center';
+    ctx.fillText('N', nx, ny + 4);
+    ctx.fillStyle = '#5cf2b0'; ctx.textAlign = 'right'; ctx.fillText('front ↑', cx - 6, cy - R * k + 12);
+    ctx.textAlign = 'left';
+  }
+
   // Home.
   ctx.fillStyle = '#ffb547'; ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI * 2); ctx.fill();
   ctx.strokeStyle = 'rgba(255,181,71,.25)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(cx, cy, 14, 0, Math.PI * 2); ctx.stroke();
@@ -103,7 +112,7 @@ function draw() {
       const [ex, ey] = P({ x: p.x + s * Math.sin(th) * T, y: p.y + s * Math.cos(th) * T });
       ctx.setLineDash([4, 5]); ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(ex, ey); ctx.stroke(); ctx.setLineDash([]);
     }
-    ctx.save(); ctx.translate(x, y); ctx.rotate(((a.track != null ? a.track : 0) * Math.PI) / 180);
+    ctx.save(); ctx.translate(x, y); ctx.rotate((((a.track != null ? a.track : 0) - up) * Math.PI) / 180);
     ctx.fillStyle = col; ctx.beginPath();
     if (a.onGround) ctx.arc(0, 0, 2.5, 0, Math.PI * 2); else { ctx.moveTo(0, -8); ctx.lineTo(5, 6); ctx.lineTo(0, 3); ctx.lineTo(-5, 6); ctx.closePath(); }
     ctx.fill(); ctx.restore();
@@ -218,7 +227,7 @@ function renderPanel(force) {
     $('n-needle').setAttribute('transform', `rotate(${next.lookBearing})`);
     $('n-look').innerHTML = next.overheadNow
       ? `<b>Straight up.</b> ${fl(next.altFt)} above you.`
-      : `Look <b>${dir(next.lookBearing)}</b>, <b>${Math.round(next.lookElev != null ? next.lookElev : 0)}°</b> up.<br><span class="dim">${mi(next.distM)} out${next.track != null ? `, heading ${dir(next.track)}` : ''}</span>`;
+      : `Look <b>${SWF.where(S, next.lookBearing)}</b>, <b>${Math.round(next.lookElev != null ? next.lookElev : 0)}°</b> up.<br><span class="dim">${mi(next.distM)} out${next.track != null ? `, heading ${SWF.where(S, next.track)}` : ''}</span>`;
     $('n-flown').textContent = flownTxt(next.flown);
   }
 
@@ -226,7 +235,7 @@ function renderPanel(force) {
   $('queue').innerHTML = rows.map((a) => `<li class="${a.tier === 'heads' ? 'miss' : ''}">
       <span class="t">${eta(a)}s</span>
       <span>${esc(a.callsign || a.reg || a.hex)} <span class="r">${esc(a.type || '')} ${fl(a.altFt)} ${esc(routeTxt(a.route))}${a.tier === 'heads' ? ' · small' : ''}${a.flown ? ' · ✈︎ flown' : ''}${a.mil ? ' · MIL' : ''}</span></span>
-      <span class="r">${dir(a.bearing)}</span></li>`).join('');
+      <span class="r">${SWF.where(S, a.bearing)}</span></li>`).join('');
 
   $('s-count').textContent = S.today.overheadCount;
   $('s-low').textContent = S.today.lowest ? fl(S.today.lowest.altFt) : '—';

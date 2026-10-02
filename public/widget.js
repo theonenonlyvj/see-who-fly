@@ -1,0 +1,59 @@
+// /widget: the one plane worth knowing about right now, for a dashboard tile. The choice rules are
+// SWF.pickWidget in view.js.
+const box = document.getElementById('w');
+const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fl = (ft) => (ft == null ? '' : ft >= 18000 ? `FL${Math.round(ft / 100)}` : `${Math.round(ft / 100) * 100} ft`);
+const route = (r) => {
+  if (!r) return '';
+  const end = (e) => (e && e.iata) || '?';
+  if (r.inferred === 'landing' && r.to) return `${r.from ? end(r.from) + ' ' : ''}→ ${end(r.to)} (landing)`;
+  if (r.inferred === 'departing' && r.from) return `${end(r.from)} → (departing)`;
+  if (r.inferred === 'origin' && r.from) return `from ${end(r.from)}`;
+  return r.from || r.to ? `${end(r.from)} → ${end(r.to)}` : '';
+};
+const name = (a) => a.callsign || a.reg || a.hex;
+const sub = (a) => [a.route && a.route.airline, route(a.route)].filter(Boolean).join(' · ');
+const meta = (a) => [a.desc || a.type, fl(a.altFt)].filter(Boolean).join(' · ');
+const look = (a) => `Look <b>${esc(SWF.where(S, a.lookBearing != null ? a.lookBearing : a.bearing))}</b>, ${Math.round(a.lookElev != null ? a.lookElev : (a.elevation || 0))}° up`;
+const CLS = [['airline', 'airline'], ['privateplus', 'private plus'], ['private', 'private'], ['cargo', 'cargo'], ['heli', 'helicopter'], ['military', 'military']];
+
+let S = null, build = null, fetchedAt = 0;
+function render() {
+  if (!S) return;
+  const age = (Date.now() - fetchedAt) / 1000;
+  // Lost the server (restart, Wi-Fi): say so rather than freeze on an old plane.
+  const down = S.stale || age > 20;
+  const pick = SWF.pickWidget(down ? [] : S.aircraft, age);
+  const a = pick.plane;
+  const eta = (p) => Math.max(0, Math.round(p.etaS - age));
+  const ago = (p) => Math.round(p.sinceLookupS + age);
+  let html;
+  if (pick.mode === 'now') {
+    html = `<div class="wl">OVERHEAD NOW</div><div class="cs">${esc(name(a))}</div><div class="sub">${esc(sub(a))}</div><div class="meta">${esc(meta(a))}</div><div class="lookw">${look(a)}</div>`
+      + (pick.other ? `<div class="foot">also ${esc(name(pick.other))}</div>` : '');
+  } else if (pick.mode === 'next') {
+    html = `<div class="wl">NEXT · LOOK UP</div><div class="big">${eta(a)}s</div><div class="cs">${esc(name(a))}</div><div class="sub">${esc(sub(a))}</div><div class="meta">${esc(meta(a))}</div><div class="lookw">${look(a)}</div>`
+      + (pick.passed ? `<div class="foot">just passed: ${esc(name(pick.passed))} · ${ago(pick.passed)}s ago</div>` : '');
+  } else if (pick.mode === 'passed') {
+    html = `<div class="wl">JUST PASSED · ${ago(a)}s ago</div><div class="cs">${esc(name(a))}</div><div class="sub">${esc(sub(a))}</div><div class="meta">${esc(meta(a))}</div>`
+      + (pick.next ? `<div class="foot">next: ${esc(name(pick.next))} in ${eta(pick.next)}s</div>` : '');
+  } else {
+    const bc = (S.today && S.today.byClass) || {};
+    html = `<div class="wl">${down ? 'FLIGHT FEED IS DOWN' : 'CLEAR SKY'}</div><div class="counts">`
+      + CLS.filter(([k]) => (k !== 'cargo' && k !== 'heli') || (bc[k] && bc[k].all)).map(([k, label]) => {
+        const v = bc[k] || { all: 0, lookup: 0 };
+        return `<b>${v.lookup}</b> ${label} <i>of ${v.all}</i>`;
+      }).join('<br>') + '</div><div class="foot">today over the house</div>';
+  }
+  box.className = 'w ' + pick.mode;
+  box.innerHTML = html;
+}
+async function tick() {
+  try {
+    S = await (await fetch('/api/state', { cache: 'no-store' })).json(); fetchedAt = Date.now();
+    if (build && S.build !== build) return location.reload();
+    build = S.build;
+  } catch (e) {}
+  render();
+}
+tick(); setInterval(tick, 2000); setInterval(render, 1000);
