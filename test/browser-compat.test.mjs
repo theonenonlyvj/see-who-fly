@@ -59,3 +59,8 @@ test('the type counter has no emoji (main page and TV build)', () => {
     assert.doesNotMatch(block.replace(/\u2708\uFE0E/g, ''), /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\uFE0F]/u, f);
   }
 });
+
+// VJ 2026-10-02: photos of common airliners are negative value; the page hides them by the server flag.
+test('the photo gate uses the server commonAirliner flag (main page and TV build)', () => {
+  for (const f of ['public/app.js', 'public/tv/app.js']) assert.match(fs.readFileSync(f, 'utf8'), /!a\.commonAirliner/, f);
+});

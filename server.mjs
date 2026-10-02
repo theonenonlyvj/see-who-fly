@@ -24,7 +24,7 @@ import { loadPlaces, placesInView } from './lib/places.mjs';
 import { newestExport, loadFlighty, flownMatch } from './lib/flighty.mjs';
 import { PassTracker, PassLog, summarize } from './lib/passlog.mjs';
 import { chainFromVrs, pickLeg } from './lib/routes.mjs';
-import { classify } from './lib/classify.mjs';
+import { classify, isCommonAirliner } from './lib/classify.mjs';
 import { OverheadHold } from './lib/hold.mjs';
 import { typeFacts } from './lib/typefacts.mjs';
 import { inferEndpoint } from './lib/infer.mjs';
@@ -92,6 +92,7 @@ function describe(ac, now) {
   const callsign = clean(ac.flight) || '';
   const mil = ((ac.dbFlags ?? 0) & 1) === 1, type = clean(ac.t, 4), category = clean(ac.category, 2);
   const st = { x: p.x, y: p.y, altFt, vrate, track: ac.track ?? null };
+  const cls = classify({ callsign, type, mil, category });
   return {
     hex: ac.hex.toLowerCase(), callsign, reg: clean(ac.r), type: clean(ac.t, 4), desc: cleanText(ac.desc),
     category: clean(ac.category, 2), squawk: clean(ac.squawk, 4), emergency: ac.emergency && ac.emergency !== 'none' ? clean(ac.emergency, 12) : null,
@@ -104,7 +105,8 @@ function describe(ac, now) {
     lookBearing: look.lookBearing ?? bearing, lookElev: look.lookElev ?? elevation,
     flown: flownMatch(flighty, clean(ac.r), callsign),
     route: onGround ? null : routeFor(callsign, st, ac.hex.toLowerCase()),
-    cls: classify({ callsign, type, mil, category }),
+    cls,
+    commonAirliner: isCommonAirliner({ cls, type, callsign }),
     facts: typeFacts(type),
     info: infoFor(ac.hex.toLowerCase()),
     mph: ac.gs != null ? Math.round(ac.gs * 1.15078) : null,

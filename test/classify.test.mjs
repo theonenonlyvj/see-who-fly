@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { classify, CLASSES } from '../lib/classify.mjs';
+import { classify, CLASSES, isCommonAirliner } from '../lib/classify.mjs';
 import { typeFacts } from '../lib/typefacts.mjs';
 import { inferEndpoint } from '../lib/infer.mjs';
 
@@ -71,4 +71,19 @@ test('flight-school trainers count as private even under an operator code', () =
   assert.equal(classify({ callsign: 'XYZ12', type: 'C208' }), 'airline');  // Caravan commuter stays airline
   assert.equal(classify({ callsign: 'SWA16', type: 'B38M' }), 'airline'); // airlines unaffected
   assert.equal(classify({ callsign: 'WIA531', type: 'DHC6' }), 'airline'); // commuter turboprop stays airline
+});
+
+test('photos: only everyday airliners are "common"; the unusual planes keep theirs', () => {
+  const common = (callsign, type, mil = false) => isCommonAirliner({ cls: classify({ callsign, type, mil }), type, callsign });
+  assert.equal(common('SWA2704', 'B737'), true);
+  assert.equal(common('AAL1', 'A321'), true);
+  assert.equal(common('SKW4954', 'CRJ7'), true);
+  assert.equal(common('DAL1115', 'B712'), true);
+  assert.equal(common('KLM685', 'B77W'), false);   // wide-body
+  assert.equal(common('WIA531', 'DHC6'), false);   // commuter Twin Otter
+  assert.equal(common('XYZ12', 'C208'), false);    // Caravan
+  assert.equal(common('N737BZ', 'B737'), false);   // a 737 on its own tail number: a private BBJ, worth a photo
+  assert.equal(common('FDX1201', 'B763'), false);  // cargo
+  assert.equal(common('EJA17', 'C56X'), false);    // business jet
+  assert.equal(common('FAMUS18', 'C17', true), false);
 });

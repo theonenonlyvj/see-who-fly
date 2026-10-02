@@ -144,8 +144,11 @@ function factsLine(a) {
   return parts.join(' · ');
 }
 const badPhotos = {};
+// No photos of everyday airliners (the server's commonAirliner: narrow-bodies and regionals on airline
+// flights): the point is seeing the unusual planes, and a stock 737 shot only takes space.
+const showPhoto = (a) => !a.commonAirliner;
 function setPhoto(el, a) {
-  const src = a.info && a.info.photo;
+  const src = showPhoto(a) && a.info && a.info.photo;
   if (!src || badPhotos[src]) { el.className = 'photo'; return; }
   if (el.getAttribute('src') !== src) {
     el.onerror = function () { badPhotos[src] = true; el.className = 'photo'; };
