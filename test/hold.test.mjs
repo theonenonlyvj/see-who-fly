@@ -60,3 +60,11 @@ test('a held plane coming back as a small heads-up is inbound too', () => {
   h.apply([plane('a', true)], 0);
   assert.equal(h.apply([{ hex: 'a', overheadNow: false, tier: 'heads', etaS: 25 }], 30_000)[0].justPassedS, null);
 });
+
+test('a heads-up-size pass (visible, not LOOK UP) is held too, so a plane you heard can be marked', () => {
+  const h = new OverheadHold({ holdS: 90, headsDeg: 0.8 });
+  h.apply([{ hex: 'j', overheadNow: false, nowDeg: 1.4 }], 0);            // a midsize jet ~700 m away
+  assert.equal(h.apply([{ hex: 'j', overheadNow: false, nowDeg: 1.4 }], 2_000)[0].justPassedS, 0); // passing right now: markable
+  assert.equal(h.apply([{ hex: 'j', overheadNow: false, nowDeg: 0.3 }], 20_000)[0].justPassedS, 18);
+  assert.equal(h.apply([{ hex: 'k', overheadNow: false, nowDeg: 0.05 }], 20_000)[0].justPassedS, null); // a dot at FL420
+});

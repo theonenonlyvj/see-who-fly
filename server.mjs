@@ -28,12 +28,14 @@ import { classify } from './lib/classify.mjs';
 import { OverheadHold } from './lib/hold.mjs';
 import { typeFacts } from './lib/typefacts.mjs';
 import { inferEndpoint } from './lib/infer.mjs';
+import { originFromTrace, mergeTraces } from './lib/origin.mjs';
+import zlib from 'node:zlib';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const BUILD = String(Date.now()); // changes on every restart; open screens reload themselves
 const cfgPath = process.env.SEE_WHO_FLY_HOME_CONFIG || path.join(ROOT, 'config.example.json');
 const cfg = {
-  ground_elev_ft: 0, view_radius_nm: 6, feed_radius_nm: 10, alert_lead_s: 90, overhead_hold_s: 90, log_within_mi: 2, lookup_deg: 2.0, heads_deg: 0.8,
+  ground_elev_ft: 0, view_radius_nm: 6, feed_radius_nm: 10, alert_lead_s: 90, overhead_hold_s: 90, near_mi: 2, log_within_mi: 2, lookup_deg: 2.0, heads_deg: 0.8,
   tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
   ...JSON.parse(fs.readFileSync(cfgPath, 'utf8')),
 };
@@ -101,7 +103,7 @@ function describe(ac, now) {
     peakDeg: look.peakDeg ?? null, nowDeg: look.nowDeg ?? null, slantM: look.slantM ?? null,
     lookBearing: look.lookBearing ?? bearing, lookElev: look.lookElev ?? elevation,
     flown: flownMatch(flighty, clean(ac.r), callsign),
-    route: onGround ? null : routeFor(callsign, st),
+    route: onGround ? null : routeFor(callsign, st, ac.hex.toLowerCase()),
     cls: classify({ callsign, type, mil, category }),
     facts: typeFacts(type),
     info: infoFor(ac.hex.toLowerCase()),
@@ -113,14 +115,69 @@ function describe(ac, now) {
 
 // Route = the leg of this flight number that fits what the plane is doing (lib/routes.mjs), or the
 // airline alone when no leg fits. Never a guessed route.
-function routeFor(callsign, st) {
-  const c = routeCache.get(callsign)?.v;
+function routeFor(callsign, st, hex) {
+  const c = callsign ? routeCache.get(callsign)?.v : null;
   const l = c ? pickLeg(c.chain, st) : null;
   if (l) return { airline: c.airline, ...l };
-  // No listed leg fits: say what the plane itself shows, near a known local airport.
+  // No listed leg fits: say what the plane itself shows. Landing/departing from its approach path
+  // near a known local airport; where it took off from, from its own track today (lib/origin.mjs).
+  const airline = c?.airline || null;
   const e = inferEndpoint(st, AIRPORTS, cfg.ground_elev_ft);
-  if (e) return { airline: c?.airline || null, inferred: e.kind, ...(e.kind === 'landing' ? { to: e.airport } : { from: e.airport }) };
-  return c?.airline ? { airline: c.airline } : null;
+  const o = originFor(hex);
+  if (e?.kind === 'landing') return { airline, inferred: 'landing', to: e.airport, ...(o && o.iata !== e.airport.iata ? { from: o } : {}) };
+  if (e) return { airline, inferred: 'departing', from: e.airport };
+  if (o) return { airline, inferred: 'origin', from: o };
+  return airline ? { airline } : null;
+}
+
+// ---------- where it took off (adsb.lol public trace, cached per plane) ----------
+const originCache = new Map(); // hex -> { v: { iata, name } | null, at, ttl }
+const originQueue = new Map(); // hex -> when queued
+const ORIGIN_MAX = 2000;
+const originFresh = (hex) => { const c = originCache.get(hex); return c && Date.now() - c.at < c.ttl; };
+const originFor = (hex) => (hex && originFresh(hex) && originCache.get(hex).v) || null; // never past its TTL
+let originPauseUntil = 0; // any 429 from adsb.lol pauses all trace lookups, so the feed itself isn't starved
+async function readCapped(r, max) {
+  const chunks = []; let size = 0;
+  for await (const chunk of r.body) { size += chunk.length; if (size > max) throw new Error('too big'); chunks.push(chunk); }
+  return Buffer.concat(chunks);
+}
+// One public trace file: parsed JSON, 'gone' (404), or a thrown error. A 429 pauses all lookups.
+async function getTrace(hex, kind) {
+  const r = await fetch(`https://adsb.lol/data/traces/${hex.slice(-2)}/trace_${kind}_${hex}.json`,
+    { redirect: 'manual', signal: AbortSignal.timeout(8000), headers: { 'user-agent': 'see-who-fly/0.6' } });
+  if (r.status !== 200) {
+    r.body?.cancel().catch(() => {});
+    if (r.status === 404) return 'gone';
+    if (r.status === 429) originPauseUntil = Date.now() + 10 * 60_000;
+    throw new Error(`HTTP ${r.status}`);
+  }
+  // fetch undoes a gzip Content-Encoding itself; the cap applies to what it hands back.
+  let buf = await readCapped(r, 8_000_000);
+  if (buf[0] === 0x1f && buf[1] === 0x8b) buf = zlib.gunzipSync(buf, { maxOutputLength: 8_000_000 });
+  return JSON.parse(buf.toString('utf8'));
+}
+async function originWorker() {
+  for (;;) {
+    const [hex, queuedAt] = originQueue.entries().next().value || [];
+    if (!hex || Date.now() < originPauseUntil) { await sleep(1000); continue; }
+    originQueue.delete(hex);
+    if (Date.now() - queuedAt > 60_000) continue; // queued before a pause or after the viewer left
+    if (originFresh(hex) || !/^[0-9a-f]{6}$/.test(hex)) continue;
+    let v = null, ttl = 5 * 60_000;
+    try {
+      const full = await getTrace(hex, 'full');
+      const recent = await getTrace(hex, 'recent'); // a fresh takeoff may have no full trace yet
+      if (full === 'gone' && recent === 'gone') ttl = 30 * 60_000;
+      const o = originFromTrace(mergeTraces(full === 'gone' ? null : full, recent === 'gone' ? null : recent));
+      // An answer holds for a while; "no answer yet" is retried soon.
+      if (o) { v = { iata: clean(o.code, 4) }; ttl = 15 * 60_000; }
+    } catch {}
+    originCache.delete(hex);
+    originCache.set(hex, { v, at: Date.now(), ttl });
+    if (originCache.size > ORIGIN_MAX) originCache.delete(originCache.keys().next().value);
+    await sleep(1500); // be polite to a free service
+  }
 }
 
 // ---------- aircraft info + photo (adsbdb, cached; photos proxied so the page stays self-contained) ----------
@@ -250,7 +307,7 @@ function recordPasses(passes) {
 }
 
 // ---------- feed polling ----------
-const hold = new OverheadHold({ holdS: cfg.overhead_hold_s });
+const hold = new OverheadHold({ holdS: cfg.overhead_hold_s, headsDeg: cfg.heads_deg });
 let state = { updated: null, aircraft: [], error: null };
 let lastViewer = 0;
 
@@ -285,6 +342,10 @@ async function pollOnce() {
     // Look up every airborne plane in view, not only the ones headed overhead: a lookup pattern
     // limited to near-overhead planes would itself point at the house.
     if (!a.onGround && a.distM <= VIEW_RADIUS_M && !infoFresh(a.hex)) infoQueue.add(a.hex);
+    // Origin lookups only while someone is watching, and only for planes no route list places
+    // (every such plane in view alike, so the pattern says nothing about where the house is).
+    const listed = a.route && a.route.from && a.route.to && !a.route.inferred;
+    if (!a.onGround && !listed && a.distM <= VIEW_RADIUS_M && now - lastViewer < VIEWER_WINDOW_MS && !originFresh(a.hex) && !originQueue.has(a.hex)) originQueue.set(a.hex, now);
   }
   hold.track(list, now);
   recordPasses(tracker.update(list, now));
@@ -352,7 +413,7 @@ function handleState(res) {
   lastViewer = Date.now();
   const stale = !state.updated || Date.now() - state.updated > STALE_MS;
   const live = stale ? [] : state.aircraft;
-  for (const a of live) { a.route = a.onGround ? null : routeFor(a.callsign, a); a.info = infoFor(a.hex); }
+  for (const a of live) { a.route = a.onGround ? null : routeFor(a.callsign, a, a.hex); a.info = infoFor(a.hex); }
   hold.annotate(live, Date.now());
   const sum = summarize(today.passes);
   const marks = latestMarks(today.marks);
@@ -365,7 +426,7 @@ function handleState(res) {
     stale,
     build: BUILD,
     // The client gets thresholds and relative positions; it never needs the home coordinates.
-    config: { viewRadiusM: VIEW_RADIUS_M, alertLeadS: cfg.alert_lead_s, holdS: cfg.overhead_hold_s, lookupDeg: cfg.lookup_deg, headsDeg: cfg.heads_deg, tz: cfg.tz },
+    config: { viewRadiusM: VIEW_RADIUS_M, alertLeadS: cfg.alert_lead_s, holdS: cfg.overhead_hold_s, nearM: cfg.near_mi * M_PER_MI, lookupDeg: cfg.lookup_deg, headsDeg: cfg.heads_deg, tz: cfg.tz },
     aircraft: live.map(withMarks),
     recent,
     landmarks: LANDMARKS,
@@ -373,13 +434,21 @@ function handleState(res) {
   }));
 }
 
-function handleStatic(url, res, method) {
-  const page = url.pathname === '/' || url.pathname === '/tv' || url.pathname === '/tv/' ? 'index.html' : url.pathname === '/look' ? 'look.html' : url.pathname.replace(/^\/+/, '');
+// Old smart-TV browsers (2018 Samsung = Chromium 56) get the /tv build: the same page, lowered to old
+// JavaScript. So a TV bookmarked on / keeps working when the main page uses modern code.
+const oldBrowser = (ua = '') => /Tizen|Web0S|SMART-TV|SmartTV/i.test(ua)
+  || Number((/Chrome\/(\d+)/.exec(ua) || [])[1] || 999) < 80
+  || (!/Chrome|CriOS|Firefox/.test(ua) && Number((/Version\/(\d+)[.\d]* (Mobile\/\S+ )?Safari/.exec(ua) || [])[1] || 999) < 14);
+function handleStatic(url, res, method, ua) {
+  const p = url.pathname.replace(/\/$/, '') || '/';
+  const old = oldBrowser(ua);
+  const page = p === '/tv' || (p === '/' && old) ? 'tv.html' : p === '/' ? 'index.html'
+    : p === '/look' ? (old ? 'tv-look.html' : 'look.html') : url.pathname.replace(/^\/+/, '');
   const file = path.resolve(PUBLIC_DIR, page);
   let st = null;
   try { st = fs.statSync(file); } catch {}
   if (!file.startsWith(PUBLIC_DIR) || !st || !st.isFile()) return send(res, 404, 'not found', 'text/plain');
-  res.writeHead(200, { ...SECURITY, 'content-type': MIME[path.extname(file)] || 'application/octet-stream', 'cache-control': 'no-cache' });
+  res.writeHead(200, { ...SECURITY, 'content-type': MIME[path.extname(file)] || 'application/octet-stream', 'cache-control': 'no-cache', vary: 'user-agent' });
   if (method === 'HEAD') return res.end();
   fs.createReadStream(file).on('error', () => res.destroy()).pipe(res);
 }
@@ -401,7 +470,7 @@ http.createServer((req, res) => {
       return;
     }
     if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, 'method not allowed', 'text/plain');
-    return handleStatic(url, res, req.method);
+    return handleStatic(url, res, req.method, req.headers['user-agent']);
   } catch (e) {
     console.error('request failed', e.message);
     send(res, 500, 'error', 'text/plain');
@@ -410,6 +479,7 @@ http.createServer((req, res) => {
   refreshFlighty(); setInterval(refreshFlighty, 3600_000);
   routeWorker();
   infoWorker();
+  originWorker();
   pollForever();
   console.log(`see-who-fly on http://${HOST}:${PORT}  (look-up ${cfg.lookup_deg}°/${cfg.heads_deg}°, view ${cfg.view_radius_nm} nm, ${LANDMARKS.length} places, log ${passLog.dir || 'off'})`);
 });

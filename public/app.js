@@ -1,8 +1,6 @@
 // see-who-fly client: radar + "next overhead" card. Positions are relative to home (x east, y north, metres).
 const $ = (id) => document.getElementById(id);
 const esc = SWF.esc;
-// /tv: big-type, no-mouse layout for a living-room screen.
-if (location.pathname.replace(/\/$/, '') === '/tv') document.body.classList.add('tv');
 const cvs = $('radar'), ctx = cvs.getContext('2d');
 const M_PER_MI = 1609.344, M_PER_NM = 1852, KT = 0.514444;
 const COMPASS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
@@ -57,8 +55,7 @@ function draw() {
   const dt = (performance.now() - fetchedAt) / 1000;
 
   // Range rings (nm) + cardinal ticks.
-  const TV = document.body.classList.contains('tv');
-  ctx.lineWidth = 1; ctx.font = `${TV ? 20 : 11}px ui-monospace, monospace`;
+  ctx.lineWidth = 1; ctx.font = '11px ui-monospace, monospace';
   for (let nm = 1; nm * M_PER_NM <= R + 1; nm++) {
     ctx.strokeStyle = nm % 2 ? '#0f2a26' : '#16403a';
     ctx.beginPath(); ctx.arc(cx, cy, nm * M_PER_NM * k, 0, Math.PI * 2); ctx.stroke();
@@ -113,7 +110,7 @@ function draw() {
     if (!a.onGround) {
       ctx.fillStyle = col; ctx.fillText(a.callsign || a.reg || a.hex, x + 10, y - 2);
       ctx.fillStyle = '#6c8a83';
-      ctx.fillText(`${a.type || '?'} ${fl(a.altFt)}${a.vrate > 300 ? '↑' : a.vrate < -300 ? '↓' : ''}`, x + 10, y + (TV ? 20 : 11));
+      ctx.fillText(`${a.type || '?'} ${fl(a.altFt)}${a.vrate > 300 ? '↑' : a.vrate < -300 ? '↓' : ''}`, x + 10, y + 11);
     }
   }
 }
@@ -123,7 +120,8 @@ const fl = (ft) => (ft == null ? '' : ft >= 18000 ? `FL${Math.round(ft / 100)}` 
 const mi = (m) => `${(m / M_PER_MI).toFixed(m < M_PER_MI ? 2 : 1)} mi`;
 const routeTxt = (r) => {
   if (!r) return '';
-  if (r.inferred === 'landing' && r.to) return `→ ${r.to.iata} (landing)`;
+  if (r.inferred === 'landing' && r.to) return `${r.from ? r.from.iata + ' ' : ''}→ ${r.to.iata} (landing)`;
+  if (r.inferred === 'origin' && r.from) return `from ${r.from.iata}`;
   if (r.inferred === 'departing' && r.from) return `${r.from.iata} → (departing)`;
   return r.from || r.to ? `${(r.from && r.from.iata) || '?'} → ${(r.to && r.to.iata) || '?'}` : '';
 };
@@ -226,11 +224,9 @@ function renderPanel(force) {
   const bc = S.today.byClass || {};
   // Big number = look-ups (planes worth stepping out for); small = everything that passed nearby.
   // The four categories asked for always show (0 is an answer); cargo and helicopter only when seen.
-  // No emoji on the TV: its 2018 browser draws several of them as empty boxes.
-  const tv = document.body.classList.contains('tv');
-  $('s-cls').innerHTML = CLS.filter(function (c) { return c[0] !== 'cargo' && c[0] !== 'heli' || (bc[c[0]] && bc[c[0]].all); }).map(function (c) {
-    const v = bc[c[0]] || { all: 0, lookup: 0 };
-    return `<span>${tv ? '' : c[1] + ' '}<b>${v.lookup}</b> ${c[2]} <i>of ${v.all}</i></span>`;
+  $('s-cls').innerHTML = CLS.filter(([k]) => (k !== 'cargo' && k !== 'heli') || bc[k]?.all).map(([k, icon, label]) => {
+    const v = bc[k] ?? { all: 0, lookup: 0 };
+    return `<span>${icon} <b>${v.lookup}</b> ${label} <i>of ${v.all}</i></span>`;
   }).join('');
   $('s-types').textContent = Object.entries(S.today.types).sort((a, b) => b[1] - a[1]).map(([t, n]) => `${t}×${n}`).join('  ');
 }

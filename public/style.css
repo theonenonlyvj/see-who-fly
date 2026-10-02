@@ -80,28 +80,12 @@ header p { margin: 4px 0 0; font-size: 11px; }
 .site-footer { margin-top: auto; padding-top: 8px; font-size: 11px; color: var(--dim); text-align: center; }
 .site-footer a { color: var(--phos); }
 
-/* /tv: living-room screen. Bigger type, no buttons, no cursor. */
-body.tv { cursor: none; }
-body.tv main { grid-template-columns: 1fr 34vw; }
-body.tv aside { padding: 2.2vw; gap: 1.4vw; font-size: 1.6vw; }
-body.tv header h1 { font-size: 3vw; }
-body.tv header p, body.tv .site-footer, body.tv #o-marks, body.tv .label { font-size: 1vw; }
-body.tv .site-footer, body.tv #o-marks { display: none; }
-body.tv #now .cs { font-size: 3.4vw; }
-body.tv .cs { font-size: 2.4vw; }
-body.tv .eta { font-size: 6vw; }
-body.tv .route, body.tv .meta, body.tv .lookline, body.tv .flown { font-size: 1.3vw; }
-body.tv .compass { width: 7vw; height: 7vw; }
-body.tv #queue li { font-size: 1.2vw; grid-template-columns: 4vw 1fr auto; }
-body.tv .stats b { font-size: 2.4vw; } body.tv .stats small { font-size: .8vw; }
-body.tv .scope-hud { font-size: 1.1vw; }
-
-/* Old TV browsers (e.g. 2018 Samsung Tizen 4, Chromium ~56) have no CSS grid: fall back to flexbox. */
+/* /tv serves this same stylesheet to old TV browsers (e.g. 2018 Samsung Tizen 4, Chromium ~56), which
+   have no CSS grid: fall back to flexbox. */
 @supports not (display: grid) {
   main { display: flex; }
   .scope { flex: 1 1 auto; }
   aside { flex: 0 0 380px; }
-  body.tv aside { flex: 0 0 34vw; }
   aside > * + * { margin-top: 14px; }
   #next .body { display: flex; flex-wrap: wrap; align-items: center; }
   #next .eta { margin-right: 14px; }
@@ -121,9 +105,6 @@ body.tv .scope-hud { font-size: 1.1vw; }
   /* make the radar's size independent of flex height rules */
   .scope { min-height: 100vh; }
   #radar { position: absolute; top: 0; left: 0; }
-  body.tv aside > * + * { margin-top: 1.4vw; }
-  body.tv #queue li > .t { flex-basis: 4vw; }
-  body.tv .scope-hud > * + * { margin-left: 1.4vw; }
 }
 
 /* v0.5: photos, facts, categories */
@@ -135,21 +116,3 @@ body.tv .scope-hud { font-size: 1.1vw; }
 .cls span { display: inline-block; margin-right: 12px; white-space: nowrap; }
 .cls b { color: var(--phos); font-weight: 600; }
 .cls i { color: var(--amber); font-style: normal; font-size: 10px; }
-body.tv .photo { height: 11vw; }
-body.tv .facts, body.tv .cls { font-size: 1.1vw; }
-/* TV must fit one screen without scrolling: keep the Next card lean */
-body.tv .photo { height: 8vw; }
-body.tv #n-photo, body.tv #n-facts { display: none !important; }
-body.tv .meta { font-size: 1.05vw; }
-body.tv #now .cs { font-size: 2.8vw; }
-body.tv .eta { font-size: 5vw; }
-body.tv .facts { font-size: 1.05vw; }
-body.tv .cls { font-size: 1.15vw; }
-body.tv #inbound, body.tv header p { display: none; }
-body.tv .compass { width: 5vw; height: 5vw; }
-body.tv .photo { height: 7vw; }
-body.tv aside { gap: 1vw; }
-body.tv #o-photo { float: right; width: 40%; height: 8vw; margin: 0 0 .5vw 1vw; }
-body.tv #now .body::after { content: ""; display: block; clear: both; }
-body.tv #n-meta { display: none; }
-body.tv header h1 { font-size: 2.4vw; margin: 0; }

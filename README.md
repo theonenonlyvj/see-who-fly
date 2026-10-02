@@ -18,10 +18,11 @@ Have feedback? → **[Tell me here](https://theonenonlyvj.github.io/personal-sit
 - **Next Overhead.** A countdown (alert 90 s out, enough time to get outside), plus which way to look ("Look SE, 21° up"), the airline, route, aircraft type and altitude.
 - **"You've flown this plane."** If you give it your [Flighty](https://flighty.com/) export, it tells you when a plane overhead is one you've actually flown on, matched by tail number.
 - **Military flag.** Military aircraft get a blue color and a **MIL** badge.
-- **Mark what you noticed.** Open `/look` on your phone: pick **Desk / Front porch / Back porch**, then tap **Heard / Not heard** and **Seen / Not seen** for each plane. Each is optional, so unmarked never means "no", and "Not seen" means you looked and couldn't spot it. The marks are saved so the thresholds can be tuned to what you actually see and hear.
+- **Mark what you noticed.** Open `/look` on your phone: pick **Desk / Front porch / Back porch**, then tap **Heard / Not heard** and **Seen / Not seen** for each plane. Each is optional, so unmarked never means "no", and "Not seen" means you looked and couldn't spot it. The marks are saved so the thresholds can be tuned to what you actually see and hear. Every plane within 2 miles is listed there too ("Nearby"), so you can mark one you heard even if the screen didn't flag it.
 - **Overhead today, by type.** Airline, private plus (business jets), private (small planes), cargo, helicopter, military: how many were worth looking up at, out of how many passed nearby.
 - **More about each plane.** A photo when one exists, who owns it, engines and wingspan, and live numbers in plain units (ft above you, mph, climb/descent).
 - **Landing at your airport.** When the route lists don't know a flight, a plane on approach to a local airport is shown as "→ SXM (landing)" (any place in your places file with an `iata` code counts as a local airport).
+- **Where it took off from.** For planes no route list knows (private jets, charters), the plane's own public track for the day shows where its current leg began, e.g. "TUL → SXM (landing)" or "from TUL". No answer if the track starts mid-air or isn't next to an airport.
 - **Today's stats.** How many planes passed over, the lowest pass, the military count and the type mix. Every pass is saved to a log file, so the stats survive restarts.
 
 No radio or antenna is needed. It uses free, public, crowd-sourced aircraft data ([adsb.lol](https://adsb.lol), [adsb.fi](https://adsb.fi)).
@@ -50,7 +51,7 @@ SEE_WHO_FLY_HOME_CONFIG=~/see-who-fly-home.json npm start
 
 ### Put it on a TV
 
-Open **http://YOUR-COMPUTER-IP:8093/tv** in the TV's web browser (start the server with `SEE_WHO_FLY_HOST=0.0.0.0` as below). `/tv` is a big-type, no-buttons layout. The browser code is kept to what a 2018-era TV browser (Chromium 56) understands, and there's a layout fallback for browsers without CSS grid, so most smart-TV browsers should work. Turn off the TV's auto power-off if you want it on all day, and mind burn-in on OLED screens.
+Open **http://YOUR-COMPUTER-IP:8093/** in the TV's web browser (start the server with `SEE_WHO_FLY_HOST=0.0.0.0` as below). It's the same page as on a computer. The main page uses modern JavaScript; older smart-TV browsers (built for a 2018 Samsung, Chromium 56) are recognised and get a copy of the same page built for them, which is also always at **/tv**. Turn off the TV's auto power-off if you want it on all day, and mind burn-in on OLED screens.
 
 ### Use it from your phone
 
@@ -81,6 +82,7 @@ Keep personal files out of the repo folder; `.gitignore` also blocks the usual n
 | `heads_deg` | 0.8 | apparent size for **heads-up** (visible but small) |
 | `alert_lead_s` | 90 | how many seconds ahead a plane turns amber |
 | `overhead_hold_s` | 90 | how long a plane stays on the Overhead Now card (as "just passed") after it stops looking big |
+| `near_mi` | 2 | planes within this distance are listed as "Nearby" on `/look` for marking |
 | `log_within_mi` | 2 | planes passing closer than this get saved to the log (big ones farther out are saved too) |
 | `feed_radius_nm` | 10 | how far out to ask the feed for planes (wider than the radar, for earlier warnings) |
 
@@ -107,8 +109,8 @@ Keep personal files out of the repo folder; `.gitignore` also blocks the usual n
 
 ## For agents and contributors
 
-- **No dependencies.** It's plain Node (ESM) and a static `public/` front end (HTML/CSS/canvas, no build step).
-- **Layout:** `server.mjs` handles HTTP, polling and wiring. `lib/geo.mjs` has the local frame and segment closest-approach. `lib/visibility.mjs` has the wingspans, apparent size and tier prediction. `lib/marks.mjs` handles heard/seen marks. `lib/passlog.mjs` has the pass tracker, daily summary and JSONL log. `lib/flighty.mjs` finds the newest export, parses the CSV and matches tail or flight. `lib/places.mjs` loads landmarks and filters them to the window. `public/` holds `index.html`, `app.js` and `style.css`.
+- **No runtime dependencies.** It's plain Node (ESM) and a static `public/` front end (HTML/CSS/canvas). The browser code is modern JavaScript; `npm run build:tv` lowers it with esbuild into the committed `public/tv/` copy (plus `tv.html`, `tv-look.html`) for old TV browsers. Run it after changing `public/*.js` or the HTML; a test fails if the copy is stale. `npm run build:airports` rebuilds `lib/airports.json` from OurAirports.
+- **Layout:** `server.mjs` handles HTTP, polling and wiring. `lib/geo.mjs` has the local frame and segment closest-approach. `lib/visibility.mjs` has the wingspans, apparent size and tier prediction. `lib/marks.mjs` handles heard/seen marks. `lib/passlog.mjs` has the pass tracker, daily summary and JSONL log. `lib/flighty.mjs` finds the newest export, parses the CSV and matches tail or flight. `lib/places.mjs` loads landmarks and filters them to the window. `lib/origin.mjs` finds where a flight took off from its public track. `lib/hold.mjs` keeps a plane that just passed on screen. `public/` holds `index.html`, `app.js` and `style.css`.
 - **Tests:** `npm test` (Node's built-in runner, `test/*.test.mjs`). Add a test for any change to prediction or logging.
 - **API:** `POST /api/mark` `{hex, callsign, spot: desk|front|back, heard: true|false|null, seen: true|false|null}`. `GET /api/state` returns aircraft (relative `x`/`y` metres, tier, ETA, apparent size, marks, route, flown match, military flag), landmarks (relative), today's summary and a `build` id. Open screens reload when `build` changes.
 - **Invariants:** never commit real home coordinates, private places, pass logs or Flighty exports, and never send home lat/lon to the browser. Be polite to the free feeds: keep the poll intervals and the backoff.
@@ -119,4 +121,4 @@ Keep personal files out of the repo folder; `.gitignore` also blocks the usual n
 
 ## Credits
 
-Aircraft positions: [adsb.lol](https://adsb.lol) and [adsb.fi](https://adsb.fi) (community-fed, open data). Routes: [VRS standing data](https://github.com/vradarserver/standing-data) (mirrored by adsb.lol) and [adsbdb](https://www.adsbdb.com). Part of Vijay's VGames side projects. [Feedback welcome](https://theonenonlyvj.github.io/personal-site/contact).
+Aircraft positions: [adsb.lol](https://adsb.lol) and [adsb.fi](https://adsb.fi) (community-fed, open data). Routes: [VRS standing data](https://github.com/vradarserver/standing-data) (mirrored by adsb.lol) and [adsbdb](https://www.adsbdb.com). Where a flight took off: adsb.lol's public traces. Airports: [OurAirports](https://ourairports.com/data/) (public domain). Part of Vijay's VGames side projects. [Feedback welcome](https://theonenonlyvj.github.io/personal-site/contact).

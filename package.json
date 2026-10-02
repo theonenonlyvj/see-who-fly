@@ -1,12 +1,14 @@
 {
   "name": "see-who-fly",
-  "version": "0.3.0",
+  "version": "0.6.0",
   "private": true,
   "type": "module",
   "description": "Real-time screen of the aircraft about to pass over one point.",
   "scripts": {
     "start": "node server.mjs",
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test test/*.test.mjs",
+    "build:tv": "node scripts/build-tv.mjs",
+    "build:airports": "node scripts/build-airports.mjs"
   },
   "engines": {
     "node": ">=18"
