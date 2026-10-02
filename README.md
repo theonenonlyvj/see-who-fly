@@ -47,7 +47,7 @@ SEE_WHO_FLY_HOME_CONFIG=~/see-who-fly-home.json npm start
 
 ### Put it on a TV
 
-Open **http://YOUR-COMPUTER-IP:8093/tv** in the TV's web browser (start the server with `SEE_WHO_FLY_HOST=0.0.0.0` as below). `/tv` is a big-type, no-buttons layout. It needs a reasonably recent browser (on Samsung TVs, roughly 2022 models or newer). Turn off the TV's auto power-off if you want it on all day, and mind burn-in on OLED screens.
+Open **http://YOUR-COMPUTER-IP:8093/tv** in the TV's web browser (start the server with `SEE_WHO_FLY_HOST=0.0.0.0` as below). `/tv` is a big-type, no-buttons layout. The browser code is kept to what a 2018-era TV browser (Chromium 56) understands, and there's a layout fallback for browsers without CSS grid, so most smart-TV browsers should work. Turn off the TV's auto power-off if you want it on all day, and mind burn-in on OLED screens.
 
 ### Use it from your phone
 
