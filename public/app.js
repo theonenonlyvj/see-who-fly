@@ -125,7 +125,7 @@ const routeTxt = (r) => {
   if (r.inferred === 'departing' && r.from) return `${r.from.iata} → (departing)`;
   return r.from || r.to ? `${(r.from && r.from.iata) || '?'} → ${(r.to && r.to.iata) || '?'}` : '';
 };
-const CLS = [['airline', '✈️', 'airline'], ['privateplus', '💼', 'private plus'], ['private', '🛩️', 'private'], ['cargo', '📦', 'cargo'], ['heli', '🚁', 'helicopter'], ['military', '🎖️', 'military']];
+const CLS = [['airline', 'airline'], ['privateplus', 'private plus'], ['private', 'private'], ['cargo', 'cargo'], ['heli', 'helicopter'], ['military', 'military']];
 const num = (n) => (n == null ? '' : String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ','));
 // Plain-units live line: height above the house, mph, climbing/descending rate.
 function liveLine(a) {
@@ -224,9 +224,9 @@ function renderPanel(force) {
   const bc = S.today.byClass || {};
   // Big number = look-ups (planes worth stepping out for); small = everything that passed nearby.
   // The four categories asked for always show (0 is an answer); cargo and helicopter only when seen.
-  $('s-cls').innerHTML = CLS.filter(([k]) => (k !== 'cargo' && k !== 'heli') || bc[k]?.all).map(([k, icon, label]) => {
+  $('s-cls').innerHTML = CLS.filter(([k]) => (k !== 'cargo' && k !== 'heli') || bc[k]?.all).map(([k, label]) => {
     const v = bc[k] ?? { all: 0, lookup: 0 };
-    return `<span>${icon} <b>${v.lookup}</b> ${label} <i>of ${v.all}</i></span>`;
+    return `<span><b>${v.lookup}</b> ${label} <i>of ${v.all}</i></span>`;
   }).join('');
   $('s-types').textContent = Object.entries(S.today.types).sort((a, b) => b[1] - a[1]).map(([t, n]) => `${t}×${n}`).join('  ');
 }

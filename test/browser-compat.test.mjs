@@ -49,3 +49,13 @@ test('the /tv build avoids built-ins newer than Chromium 56', () => {
     }
   }
 });
+
+// VJ 2026-10-02: the type-breakdown emoji looked dumb. Keep the counter text-only.
+test('the type counter has no emoji (main page and TV build)', () => {
+  for (const f of ['public/app.js', 'public/tv/app.js']) {
+    const src = fs.readFileSync(f, 'utf8');
+    const block = src.slice(src.indexOf('CLS = '), src.indexOf('s-types'));
+    assert.ok(block.length > 0, f);
+    assert.doesNotMatch(block.replace(/\u2708\uFE0E/g, ''), /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\uFE0F]/u, f);
+  }
+});

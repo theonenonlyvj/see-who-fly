@@ -113,6 +113,6 @@ header p { margin: 4px 0 0; font-size: 11px; }
 #next .photo { grid-column: 1 / -1; margin: 6px 0 0; height: 80px; }
 .facts { font-size: 11px; color: var(--dim); margin-top: 4px; line-height: 1.4; }
 .cls { margin-top: 10px; font-size: 12px; line-height: 1.8; }
-.cls span { display: inline-block; margin-right: 12px; white-space: nowrap; }
+.cls span { display: inline-block; width: 50%; white-space: nowrap; } /* two even columns, one type per cell */
 .cls b { color: var(--phos); font-weight: 600; }
 .cls i { color: var(--amber); font-style: normal; font-size: 10px; }
