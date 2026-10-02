@@ -22,5 +22,10 @@ test('server starts and serves /api/state and the pages', async () => {
     assert.ok(ok, `server did not come up: ${err}`);
     for (const p of ['/', '/tv', '/look']) assert.equal((await fetch(`http://127.0.0.1:${port}${p}`)).status, 200, p);
     assert.equal((await fetch(`http://127.0.0.1:${port}/photo/zzzzzz`)).status, 404);
+    for (const [p, type] of [['/favicon.svg', 'image/svg+xml'], ['/favicon.ico', 'image/png'], ['/apple-touch-icon.png', 'image/png']]) {
+      const r = await fetch(`http://127.0.0.1:${port}${p}`);
+      assert.equal(r.status, 200, p); assert.equal(r.headers.get('content-type'), type, p);
+    }
+    for (const p of ['/', '/tv', '/look']) assert.match(await (await fetch(`http://127.0.0.1:${port}${p}`)).text(), /rel="icon" href="\/favicon\.svg"/, p);
   } finally { child.kill(); }
 });

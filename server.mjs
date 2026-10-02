@@ -368,7 +368,7 @@ async function pollForever() {
 // ---------- HTTP ----------
 const SECURITY = { 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer',
   'content-security-policy': "default-src 'self'; img-src 'self' data:; frame-ancestors 'none'" };
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.md': 'text/plain; charset=utf-8' };
 const PUBLIC_DIR = path.join(ROOT, 'public') + path.sep;
 const STALE_MS = 20_000;
 const EXTRA_HOSTS = new Set((process.env.SEE_WHO_FLY_ALLOWED_HOSTS || '').split(',').map((h) => h.trim().toLowerCase()).filter(Boolean));
@@ -442,7 +442,7 @@ const oldBrowser = (ua = '') => /Tizen|Web0S|SMART-TV|SmartTV/i.test(ua)
 function handleStatic(url, res, method, ua) {
   const p = url.pathname.replace(/\/$/, '') || '/';
   const old = oldBrowser(ua);
-  const page = p === '/tv' || (p === '/' && old) ? 'tv.html' : p === '/' ? 'index.html'
+  const page = p === '/favicon.ico' ? 'favicon-32.png' : p === '/tv' || (p === '/' && old) ? 'tv.html' : p === '/' ? 'index.html'
     : p === '/look' ? (old ? 'tv-look.html' : 'look.html') : url.pathname.replace(/^\/+/, '');
   const file = path.resolve(PUBLIC_DIR, page);
   let st = null;
