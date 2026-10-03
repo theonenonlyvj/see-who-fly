@@ -1,6 +1,8 @@
 // /widget: the one plane worth knowing about right now, for a dashboard tile. The choice rules are
 // SWF.pickWidget in view.js.
 const box = document.getElementById('w');
+// ?embed=1: inside another dashboard's cell (BabyOS row 4, col 5): square corners, tighter padding.
+if (/[?&]embed=1\b/.test(location.search)) document.body.classList.add('embed');
 const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const fl = (ft) => (ft == null ? '' : ft >= 18000 ? `FL${Math.round(ft / 100)}` : `${Math.round(ft / 100) * 100} ft`);
 const route = (r) => {

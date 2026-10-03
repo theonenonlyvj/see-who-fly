@@ -29,3 +29,6 @@ body.widgetpage { margin: 0; height: 100vh; overflow: hidden; background: var(--
    footer so what's left can be big. */
 .w.compact .meta, .w.compact .foot { display: none; }
 .w.compact .wl { letter-spacing: .08em; }
+/* ?embed=1 (BabyOS cell): square corners, thin padding so the text gets the room; the coloured
+   border stays, because it is the state (red overhead, amber next). */
+body.embed .w { border-radius: 0; padding: 2.5vmin 3.5vmin; }
