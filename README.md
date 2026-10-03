@@ -68,7 +68,7 @@ SEE_WHO_FLY_HOST=0.0.0.0 SEE_WHO_FLY_HOME_CONFIG=~/see-who-fly-home.json npm sta
 
 <img src="docs/phone.png" alt="The /look phone page: pick your spot, then mark Heard / Seen" width="260">
 
-Passes and marks are saved in `~/.see-who-fly/data` unless you set `SEE_WHO_FLY_DATA_DIR`.
+Passes and marks are saved in `~/.see-who-fly/data` unless you set `SEE_WHO_FLY_DATA_DIR`. Lookups (who owns each plane, its photo, type photos, routes) are kept in `~/.see-who-fly/cache` (`SEE_WHO_FLY_CACHE_DIR`), so a restart doesn't look every plane up again; planes and type photos are rechecked monthly. Two servers for two places can share one cache folder.
 
 Keep personal files out of the repo folder; `.gitignore` also blocks the usual names. Your location stays on your machine. The browser only receives positions *relative* to home, never your coordinates.
 
@@ -96,6 +96,7 @@ Keep personal files out of the repo folder; `.gitignore` also blocks the usual n
 | `SEE_WHO_FLY_PLACES` | a JSON file of landmarks to draw, e.g. `[{ "name": "Airport", "lat": .., "lon": .. }]` (see `places.example.json`) |
 | `SEE_WHO_FLY_FLIGHTY_DIR` | a folder with your Flighty exports; the newest `FlightyExport-*.csv` is used |
 | `SEE_WHO_FLY_DATA_DIR` | where to save the pass log (`passes-YYYY-MM-DD.jsonl`) and marks (`marks-YYYY-MM-DD.jsonl`); default `~/.see-who-fly/data` |
+| `SEE_WHO_FLY_CACHE_DIR` | where lookups are kept across restarts (one small file each; entries unused for 60 days are removed); can be shared by several servers; default `~/.see-who-fly/cache` |
 | `SEE_WHO_FLY_HOST`, `SEE_WHO_FLY_PORT` | where to serve; use `0.0.0.0` to open it from your phone on home Wi-Fi |
 | `SEE_WHO_FLY_ALLOWED_HOSTS` | extra hostnames to answer to, comma-separated (IP addresses and `localhost` always work) |
 
@@ -124,4 +125,4 @@ Keep personal files out of the repo folder; `.gitignore` also blocks the usual n
 
 ## Credits
 
-Aircraft positions: [adsb.lol](https://adsb.lol) and [adsb.fi](https://adsb.fi) (community-fed, open data). Routes: [VRS standing data](https://github.com/vradarserver/standing-data) (mirrored by adsb.lol) and [adsbdb](https://www.adsbdb.com). Where a flight took off: adsb.lol's public traces. Airports: [OurAirports](https://ourairports.com/data/) (public domain). Type photos: Wikipedia / [Wikimedia Commons](https://commons.wikimedia.org), credited on screen with each photographer and license. Icon: airplane from [OpenMoji](https://openmoji.org), the open-source emoji and icon project, [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/), adapted (see `public/ICONS.md`). Part of Vijay's VGames side projects. [Feedback welcome](https://theonenonlyvj.github.io/personal-site/contact).
+Aircraft positions: [adsb.lol](https://adsb.lol) and [adsb.fi](https://adsb.fi) (community-fed, open data). Routes: [VRS standing data](https://github.com/vradarserver/standing-data) (mirrored by adsb.lol) and [adsbdb](https://www.adsbdb.com). Where a flight took off: adsb.lol's public traces. Airports: [OurAirports](https://ourairports.com/data/) (public domain). Type photos: Wikipedia / [Wikimedia Commons](https://commons.wikimedia.org), credited on screen with each photographer and license ("photographer not listed" when the file names none; those are shown only if public domain or linked to their Commons page, which carries the author details). Icon: airplane from [OpenMoji](https://openmoji.org), the open-source emoji and icon project, [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/), adapted (see `public/ICONS.md`). Part of Vijay's VGames side projects. [Feedback welcome](https://theonenonlyvj.github.io/personal-site/contact).

@@ -162,7 +162,7 @@ function setPhoto(el, a) {
   const type = !own && showPhoto(a) && a.typePhoto;
   const src = own || (type && type.src);
   const credit = $(el.id + '-credit');
-  credit.textContent = type ? `${type.title} (type photo, not this plane) · photo: ${type.artist}, ${type.license}, via Wikipedia` : '';
+  credit.textContent = type ? `${type.title} (type photo, not this plane) · photo: ${type.artist || (type.file ? `see Commons file “${type.file}”` : 'no photographer listed')}, ${type.license}, via Wikipedia` : '';
   if (type && type.source) credit.setAttribute('href', type.source); else credit.removeAttribute('href');
   credit.className = 'credit' + (type && src && !badPhotos[src] ? ' on' : '');
   if (!src || badPhotos[src]) { el.className = 'photo'; credit.className = 'credit'; return; }

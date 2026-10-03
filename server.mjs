@@ -7,6 +7,8 @@
 //   SEE_WHO_FLY_FLIGHTY_DIR   optional dir of Flighty exports; the newest FlightyExport-*.csv is used and re-checked hourly
 //   SEE_WHO_FLY_FLIGHTY_CSV   optional single export (used if no dir is given)
 //   SEE_WHO_FLY_DATA_DIR      where the pass log and marks are saved (default ~/.see-who-fly/data)
+//   SEE_WHO_FLY_CACHE_DIR     where plane, type-photo and route lookups are kept across restarts; two servers
+//                             (two houses) can share one (default ~/.see-who-fly/cache)
 //   SEE_WHO_FLY_HOST / _PORT  bind address (default 127.0.0.1:8093)
 //   SEE_WHO_FLY_ALLOWED_HOSTS optional comma list of extra hostnames allowed in the Host header (IPs and localhost always are)
 //
@@ -23,7 +25,7 @@ import { parseMark, latestMarks, MarkLog } from './lib/marks.mjs';
 import { loadPlaces, placesInView } from './lib/places.mjs';
 import { newestExport, loadFlighty, flownMatch } from './lib/flighty.mjs';
 import { PassTracker, PassLog, summarize } from './lib/passlog.mjs';
-import { chainFromVrs, pickLeg } from './lib/routes.mjs';
+import { chainFromVrs, pickLeg, chainToDisk, chainFromDisk } from './lib/routes.mjs';
 import { classify, isCommonAirliner } from './lib/classify.mjs';
 import { OverheadHold } from './lib/hold.mjs';
 import { GhostFilter } from './lib/dedupe.mjs';
@@ -31,6 +33,7 @@ import { typeFacts } from './lib/typefacts.mjs';
 import { inferEndpoint } from './lib/infer.mjs';
 import { originFromTrace, mergeTraces } from './lib/origin.mjs';
 import { typeQuery, typeQueries, pickPage, creditFrom } from './lib/typephoto.mjs';
+import { DiskCache } from './lib/diskcache.mjs';
 import crypto from 'node:crypto';
 import zlib from 'node:zlib';
 
@@ -121,6 +124,7 @@ function describe(ac, now) {
 // Route = the leg of this flight number that fits what the plane is doing (lib/routes.mjs), or the
 // airline alone when no leg fits. Never a guessed route.
 function routeFor(callsign, st, hex) {
+  if (callsign) warmRoute(callsign);
   const c = callsign ? routeCache.get(callsign)?.v : null;
   const l = c ? pickLeg(c.chain, st) : null;
   if (l) return { airline: c.airline, ...l };
@@ -185,13 +189,40 @@ async function originWorker() {
   }
 }
 
+// ---------- lookups kept on disk (lib/diskcache.mjs) ----------
+// Memory holds what's in use; disk holds everything looked up before, so a restart starts warm and a
+// second server for another house reuses the same answers. Failures are never saved.
+const DAY = 86400_000;
+const CACHE_DIR = process.env.SEE_WHO_FLY_CACHE_DIR || path.join(os.homedir(), '.see-who-fly', 'cache');
+const disk = { info: new DiskCache(CACHE_DIR, 'info'), photo: new DiskCache(CACHE_DIR, 'photo'), type: new DiskCache(CACHE_DIR, 'type'),
+  typeImg: new DiskCache(CACHE_DIR, 'typeimg'), route: new DiskCache(CACHE_DIR, 'route') };
+const IMG_MAX_AGE = 30 * DAY;
+function pruneDisk() { for (const [k, d] of Object.entries(disk)) d.prune(k === 'photo' || k === 'typeImg' ? IMG_MAX_AGE : 60 * DAY); }
+// Load a saved entry into memory the first time a key is asked about, within the map's size limit.
+// A key with nothing on disk is remembered for 10 minutes, so planes far outside the view don't
+// cost a disk read on every poll (and the other house's new entries still show up).
+const diskMiss = new Set();
+setInterval(() => diskMiss.clear(), 10 * 60_000).unref();
+function save(d, key, entry) { d.set(key, entry); diskMiss.delete(`${d.dir}|${key}`); diskMiss.delete(`route|${key}`); }
+function warm(map, d, key, max, onLoad) {
+  if (!key || map.has(key)) return;
+  const id = `${d.dir}|${key}`;
+  if (diskMiss.has(id)) return;
+  const e = d.get(key);
+  if (!e) { if (diskMiss.size < 50_000) diskMiss.add(id); return; }
+  map.set(key, e);
+  if (map.size > max) map.delete(map.keys().next().value);
+  if (onLoad) onLoad(e);
+}
+
 // ---------- aircraft info + photo (adsbdb, cached; photos proxied so the page stays self-contained) ----------
 const infoCache = new Map(); // hex -> { v: { owner, maker, model, photoUrl }, at, ttl }
 const INFO_CACHE_MAX = 3000;
-const infoFresh = (hex) => { const c = infoCache.get(hex); return c && Date.now() - c.at < c.ttl; };
+const infoFresh = (hex) => { warm(infoCache, disk.info, hex, INFO_CACHE_MAX); const c = infoCache.get(hex); return c && Date.now() - c.at < c.ttl; };
 const infoQueue = new Set();
 const PHOTO_HOSTS = /^https:\/\/(image\.)?airport-data\.com\//;
 function infoFor(hex) {
+  warm(infoCache, disk.info, hex, INFO_CACHE_MAX);
   const c = infoCache.get(hex)?.v;
   return c ? { owner: c.owner, maker: c.maker, model: c.model, photo: c.photoUrl ? `/photo/${hex}` : null } : null;
 }
@@ -209,17 +240,25 @@ async function infoWorker() {
         v = { owner: cleanText(a.registered_owner), maker: cleanText(a.manufacturer), model: cleanText(a.type), photoUrl: photo };
       }
     } catch { failed = true; }
+    // Owners and photos change rarely: a found plane is rechecked monthly, a plane with no record weekly.
+    // A failed lookup keeps showing what we had (and retries in 10 minutes); it is never saved.
+    const entry = { v: failed ? (infoCache.get(hex)?.v ?? null) : v, at: Date.now(), ttl: failed ? 10 * 60_000 : v ? 30 * DAY : 7 * DAY };
     infoCache.delete(hex);
-    infoCache.set(hex, { v, at: Date.now(), ttl: failed ? 10 * 60_000 : 24 * 3600_000 });
+    infoCache.set(hex, entry);
+    if (!failed) save(disk.info, hex, entry);
     if (infoCache.size > INFO_CACHE_MAX) infoCache.delete(infoCache.keys().next().value);
     await sleep(500);
   }
 }
-const photoCache = new Map(); // hex -> Buffer (small LRU)
+const photoCache = new Map(); // photo URL -> Buffer (small LRU)
 async function photoFor(hex) {
-  if (photoCache.has(hex)) return photoCache.get(hex);
+  // Only planes this server has a photo record for (so one house's screen can't be used to ask what
+  // the other house saw); saved bytes are keyed by the photo's URL, so a changed photo is fetched anew.
   const url = infoCache.get(hex)?.v?.photoUrl;
   if (!url || !PHOTO_HOSTS.test(url)) return null;
+  if (photoCache.has(url)) return photoCache.get(url);
+  const saved = disk.photo.getBytes(url, IMG_MAX_AGE);
+  if (saved) { photoCache.set(url, saved); if (photoCache.size > 120) photoCache.delete(photoCache.keys().next().value); return saved; }
   // No redirects (they could point anywhere); size checked before and while reading.
   const r = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(6000), headers: { 'user-agent': 'see-who-fly/0.5' } });
   if (r.status !== 200 || !/^image\/(jpeg|png|webp)/.test(r.headers.get('content-type') || '')) return null;
@@ -227,23 +266,26 @@ async function photoFor(hex) {
   const chunks = []; let size = 0;
   for await (const chunk of r.body) { size += chunk.length; if (size > 800_000) return null; chunks.push(chunk); }
   const buf = Buffer.concat(chunks);
-  photoCache.set(hex, buf);
+  photoCache.set(url, buf);
+  disk.photo.setBytes(url, buf);
   if (photoCache.size > 120) photoCache.delete(photoCache.keys().next().value);
   return buf;
 }
 
 // ---------- type photos (Wikipedia; for planes with no photo of their own) ----------
-// Keyed by the type search ("Embraer Phenom 300"), so each type is looked up once a day at most.
+// Keyed by the type search ("Embraer Phenom 300") and kept on disk, so each type is looked up once and
+// rechecked monthly (weekly when Wikipedia had nothing), not on every restart.
 // Type searches say nothing about where the house is.
 const WIKI_UA = { 'user-agent': 'see-who-fly/0.7 (https://github.com/theonenonlyvj/see-who-fly)' };
 const WIKI_THUMB = /^https:\/\/(upload|thumb)\.wikimedia\.org\//;
 const typeCache = new Map();   // query -> { v: { id, title, artist, license, thumb } | null, at, ttl }
 const typeById = new Map();    // id -> query
 const typeQueue = new Map();   // query (cache key) -> searches to try in order
-const typeFresh = (q) => { const c = typeCache.get(q); return c && Date.now() - c.at < c.ttl; };
+const warmType = (q) => warm(typeCache, disk.type, q, 500, (e) => { if (e.v && e.v.id) typeById.set(e.v.id, q); });
+const typeFresh = (q) => { warmType(q); const c = typeCache.get(q); return c && Date.now() - c.at < c.ttl; };
 function typePhotoFor(q) {
   const v = q && typeFresh(q) && typeCache.get(q).v;
-  return v ? { src: `/typephoto/${v.id}`, title: v.title, artist: v.artist, license: v.license, source: v.source } : null;
+  return v ? { src: `/typephoto/${v.id}`, title: v.title, artist: v.artist, license: v.license, source: v.source, file: v.file || null } : null;
 }
 async function typeWorker() {
   for (;;) {
@@ -252,7 +294,7 @@ async function typeWorker() {
     if (!q) { await sleep(1000); continue; }
     typeQueue.delete(q);
     if (typeFresh(q)) continue;
-    let v = null, ttl = 24 * 3600_000;
+    let v = null, ttl = 7 * DAY, errored = false;
     for (const term of terms || [q]) {
       try {
         const search = await getJsonH(`https://en.wikipedia.org/w/api.php?action=query&format=json&generator=search&gsrlimit=1&gsrsearch=${encodeURIComponent(term)}&prop=pageimages|info&piprop=name&inprop=url`);
@@ -261,16 +303,27 @@ async function typeWorker() {
         const info = await getJsonH(`https://en.wikipedia.org/w/api.php?action=query&format=json&titles=${encodeURIComponent('File:' + page.file)}&prop=imageinfo&iiprop=extmetadata|url&iiurlwidth=500`);
         const c = creditFrom(info);
         if (c && WIKI_THUMB.test(c.thumb)) {
-          const id = crypto.createHash('sha1').update(q).digest('hex').slice(0, 12);
+          // The id changes when the photo does, so no cache (ours or the browser's) pairs an old
+          // picture with a new credit.
+          const id = crypto.createHash('sha1').update(`${q}|${c.thumb}`).digest('hex').slice(0, 12);
           typeById.set(id, q);
           // Credit text is set with textContent on the page; creditFrom already limits it to name characters.
-          v = { id, title: page.title, artist: c.artist, license: c.license, source: c.source, thumb: c.thumb };
+          v = { id, title: page.title, artist: c.artist, license: c.license, source: c.source, file: c.file, thumb: c.thumb };
+          ttl = 30 * DAY;
           break;
         }
-      } catch { ttl = 15 * 60_000; } // one failed search doesn't skip the other searches
+      } catch { errored = true; } // one failed search doesn't skip the other searches
       await sleep(500);
     }
-    typeCache.set(q, { v, at: Date.now(), ttl });
+    const prev = typeCache.get(q);
+    if (!v && errored) {
+      // Wikipedia didn't answer: keep showing what we had, and try again in 15 minutes. Not saved.
+      typeCache.set(q, { v: prev ? prev.v : null, at: Date.now(), ttl: 15 * 60_000 });
+    } else {
+      const entry = { v, at: Date.now(), ttl };
+      typeCache.set(q, entry);
+      save(disk.type, q, entry);
+    }
     if (typeCache.size > 500) typeCache.delete(typeCache.keys().next().value);
     await sleep(1000);
   }
@@ -286,11 +339,15 @@ async function typeImageFor(id) {
   const q = typeById.get(id);
   const url = q && typeCache.get(q)?.v?.thumb;
   if (!url || !WIKI_THUMB.test(url)) return null;
+  // Keyed by the thumbnail URL, so the bytes always match the credit shown with them.
+  const saved = disk.typeImg.getBytes(url, IMG_MAX_AGE);
+  if (saved) { typeImgCache.set(id, saved); if (typeImgCache.size > 120) typeImgCache.delete(typeImgCache.keys().next().value); return saved; }
   const r = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(8000), headers: WIKI_UA });
   if (r.status !== 200 || !/^image\/(jpeg|png|webp)/.test(r.headers.get('content-type') || '')) { r.body?.cancel().catch(() => {}); return null; }
   const buf = await readCapped(r, 800_000).catch(() => null);
   if (!buf) return null;
   typeImgCache.set(id, buf);
+  disk.typeImg.setBytes(url, buf);
   if (typeImgCache.size > 120) typeImgCache.delete(typeImgCache.keys().next().value);
   return buf;
 }
@@ -312,8 +369,22 @@ function refreshFlighty() {
 // fallback when VRS has nothing: adsbdb. Either way the leg must fit the plane's state to be shown.
 const routeCache = new Map(); // callsign -> { v: { airline, chain }, at, ttl }
 const routeInFlight = new Set();
-const ROUTE_TTL_MS = 6 * 3600_000, ROUTE_RETRY_MS = 5 * 60_000;
+const ROUTE_FOUND_MS = 24 * 3600_000, ROUTE_TTL_MS = 6 * 3600_000, ROUTE_RETRY_MS = 5 * 60_000;
 const routeQueue = new Set();
+// Routes are saved with the airports' own (public) lat/lon only; the positions relative to this home
+// are worked out on loading. So nothing in the folder says where a house is, and both houses share them.
+const routeKey = (cs) => cs;
+const routeToDisk = (e) => ({ ...e, v: e.v && { ...e.v, chain: chainToDisk(e.v.chain) } });
+const routeFromDisk = (e) => ({ ...e, v: e.v && { ...e.v, chain: chainFromDisk(e.v.chain, frame) } });
+function warmRoute(cs) {
+  if (!cs || routeCache.has(cs)) return;
+  const id = `route|${routeKey(cs)}`;
+  if (diskMiss.has(id)) return;
+  const e = disk.route.get(routeKey(cs));
+  if (!e) { if (diskMiss.size < 50_000) diskMiss.add(id); return; }
+  routeCache.set(cs, routeFromDisk(e));
+  if (routeCache.size > 5000) routeCache.delete(routeCache.keys().next().value);
+}
 const cleanAirport = (a) => ({ ...a, iata: clean(a.iata, 4) || '?', name: cleanText(a.name) });
 async function getJson(url) {
   const r = await fetch(url, { signal: AbortSignal.timeout(6000), headers: { 'user-agent': 'see-who-fly/0.5' } });
@@ -326,6 +397,7 @@ async function routeWorker() {
     const cs = routeQueue.values().next().value;
     if (!cs) { await sleep(500); continue; }
     routeQueue.delete(cs);
+    warmRoute(cs);
     const c = routeCache.get(cs);
     if (routeInFlight.has(cs) || (c && Date.now() - c.at < c.ttl)) continue;
     routeInFlight.add(cs);
@@ -346,8 +418,13 @@ async function routeWorker() {
       }
     } catch { failed = true; }
     // A network failure is retried in minutes; a real "unknown" is kept for hours.
-    routeCache.set(cs, { at: Date.now(), ttl: failed ? ROUTE_RETRY_MS : ROUTE_TTL_MS,
-      v: chain.length || airline ? { airline, chain: chain.map(cleanAirport) } : null });
+    // A found route is kept a day (the leg must still fit the plane to be shown); a real "unknown" for
+    // hours; a network failure is retried in minutes and not saved.
+    const found = chain.length || airline ? { airline, chain: chain.map(cleanAirport) } : null;
+    const v = failed && !found ? (routeCache.get(cs)?.v ?? null) : found;
+    const entry = { at: Date.now(), ttl: failed ? ROUTE_RETRY_MS : v ? ROUTE_FOUND_MS : ROUTE_TTL_MS, v };
+    routeCache.set(cs, entry);
+    if (!failed) save(disk.route, routeKey(cs), routeToDisk(entry));
     routeInFlight.delete(cs);
     await sleep(400); // be polite to free services
   }
@@ -430,6 +507,7 @@ async function pollOnce() {
   const list = ghosts.apply((feed.list(j) || []).map((a) => describe(a, now)).filter(Boolean), now);
   for (const a of list) {
     if (a.callsign && !a.onGround) {
+      warmRoute(a.callsign);
       const c = routeCache.get(a.callsign);
       if (!c || now - c.at > c.ttl) routeQueue.add(a.callsign);
     }
@@ -587,6 +665,7 @@ http.createServer((req, res) => {
   }
 }).listen(PORT, HOST, () => {
   refreshFlighty(); setInterval(refreshFlighty, 3600_000);
+  pruneDisk(); setInterval(pruneDisk, DAY);
   routeWorker();
   infoWorker();
   originWorker();

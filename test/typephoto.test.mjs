@@ -30,15 +30,30 @@ test('the first search hit counts only if its title shares a word with the query
 test('credit: thumbnail, photographer and license, tags stripped', () => {
   const json = { query: { pages: { '-1': { imageinfo: [{ thumburl: 'https://upload.wikimedia.org/a.jpg', descriptionurl: 'https://commons.wikimedia.org/wiki/File:a.jpg',
     extmetadata: { Artist: { value: '<div class="fn">\nA. Photographer</div>' }, LicenseShortName: { value: 'CC BY-SA 4.0' } } }] } } } };
-  assert.deepEqual(creditFrom(json), { thumb: 'https://upload.wikimedia.org/a.jpg', artist: 'A. Photographer', license: 'CC BY-SA 4.0', source: 'https://commons.wikimedia.org/wiki/File:a.jpg' });
+  assert.deepEqual(creditFrom(json), { thumb: 'https://upload.wikimedia.org/a.jpg', artist: 'A. Photographer', license: 'CC BY-SA 4.0', source: 'https://commons.wikimedia.org/wiki/File:a.jpg', file: 'a.jpg' });
   assert.equal(creditFrom({ query: { pages: { 1: { imageinfo: [{}] } } } }), null);
   const named = (artist, extra = {}) => creditFrom({ query: { pages: { 1: { imageinfo: [{ thumburl: 'https://upload.wikimedia.org/b.jpg', descriptionurl: 'https://evil.example/x', extmetadata: { Artist: { value: artist }, LicenseShortName: { value: 'CC BY-SA 3.0 & GFDL' }, ...extra } }] } } } });
   assert.equal(named('Aktuğ Ateş').artist, 'Aktuğ Ateş');                         // accents kept
   assert.equal(named('Aktuğ Ateş').license, 'CC BY-SA 3.0 & GFDL');
   assert.equal(named('Aktuğ Ateş').source, null);                                 // only Commons/Wikipedia file pages
   assert.equal(named('x', { Attribution: { value: 'Photo: Jane Doe / Airliners' } }).artist, 'Jane Doe / Airliners');
-  assert.equal(named(''), null);                                                    // can't credit it: don't show it
+  assert.equal(named(''), null);                                                    // no name, no source page, not public domain: don't show it
   assert.equal(named('<script>alert(1)</script>').artist, 'alert(1)');             // tags stripped (and set as text anyway)
+});
+
+test('no photographer we can read: shown only if public domain, or CC 4.0 with its file page to credit through', () => {
+  const photo = (artist, license, descriptionurl) => creditFrom({ query: { pages: { 1: { imageinfo: [{ thumburl: 'https://upload.wikimedia.org/c.jpg', descriptionurl,
+    extmetadata: { Artist: { value: artist }, LicenseShortName: { value: license } } }] } } } });
+  const commons = 'https://commons.wikimedia.org/wiki/File:Embraer_Phenom_300_%28N300E%29.jpg';
+  assert.deepEqual(photo('', 'CC BY-SA 4.0', commons), { thumb: 'https://upload.wikimedia.org/c.jpg', artist: null, license: 'CC BY-SA 4.0', source: commons, file: 'Embraer Phenom 300 (N300E).jpg' });
+  assert.equal(photo('', 'CC BY 4.0', commons).artist, null);
+  assert.equal(photo('', 'CC BY-SA 3.0', commons), null);                               // 2.0/3.0 need the name
+  assert.equal(photo('', 'CC BY 2.0', commons), null);
+  assert.equal(photo('', 'CC BY-SA 4.0', 'https://evil.example/x'), null);              // no real file page
+  assert.equal(photo('', 'Public domain', 'https://evil.example/x').artist, null);       // US Air Force photos and the like
+  assert.equal(photo('', 'Public domain', 'https://evil.example/x').file, null);
+  assert.equal(photo('', 'CC0', null).license, 'CC0');
+  assert.equal(photo('', 'CC BY-SA 4.0', 'https://commons.wikimedia.org/wiki/File:%E0%A4%A.jpg').file, 'E0A4A.jpg'); // bad encoding: no crash
 });
 
 test('fallback searches: maker + model, the model alone, then the description, without repeats', () => {

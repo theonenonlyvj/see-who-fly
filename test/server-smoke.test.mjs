@@ -8,7 +8,7 @@ test('server starts and serves /api/state and the pages', async () => {
   const data = fs.mkdtempSync(path.join(os.tmpdir(), 'swf-smoke-'));
   const port = 18000 + Math.floor(Math.random() * 1000);
   const child = spawn(process.execPath, ['server.mjs'], {
-    env: { ...process.env, SEE_WHO_FLY_PORT: String(port), SEE_WHO_FLY_DATA_DIR: data, SEE_WHO_FLY_PLACES: 'places.example.json' },
+    env: { ...process.env, SEE_WHO_FLY_PORT: String(port), SEE_WHO_FLY_DATA_DIR: data, SEE_WHO_FLY_CACHE_DIR: path.join(data, 'cache'), SEE_WHO_FLY_PLACES: 'places.example.json' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let err = '';

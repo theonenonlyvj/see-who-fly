@@ -65,3 +65,17 @@ test('a chain that visits the same airport twice picks the occurrence that fits 
   const back = pickLeg(loop, { x: -3000, y: 500, altFt: 1200, vrate: -800, track: 90 });
   assert.equal(back.from.iata, 'SJU'); assert.equal(back.to.iata, 'SXM');
 });
+
+test('saved routes hold only airport lat/lon; positions relative to home are rebuilt on loading', async () => {
+  const { chainToDisk, chainFromDisk } = await import('../lib/routes.mjs');
+  const { makeFrame } = await import('../lib/geo.mjs');
+  const home = makeFrame(18.04, -63.11), other = makeFrame(40.0, -100.0);
+  const chain = chainFromVrs({ _airports: [{ iata: 'SXM', location: 'Sint Maarten', lat: 18.04, lon: -63.11 }, { iata: 'JFK', lat: 40.64, lon: -73.78 }] }, home);
+  const saved = JSON.parse(JSON.stringify(chainToDisk(chain)));
+  for (const a of saved) { assert.equal('x' in a, false); assert.equal('y' in a, false); }
+  const back = chainFromDisk(saved, other);
+  assert.deepEqual(back.map((a) => a.iata), ['SXM', 'JFK']);
+  const want = other.toLocal(40.64, -73.78);
+  assert.ok(Math.abs(back[1].x - want.x) < 1 && Math.abs(back[1].y - want.y) < 1);
+  assert.deepEqual(chainFromDisk([{ iata: 'OLD', x: 5, y: 5 }, null], other), []);   // old or broken entries dropped
+});
