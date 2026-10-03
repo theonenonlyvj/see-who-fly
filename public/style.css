@@ -119,3 +119,9 @@ header p { margin: 4px 0 0; font-size: 11px; }
 .cls span { display: inline-block; width: 50%; white-space: nowrap; } /* two even columns, one type per cell */
 .cls b { color: var(--phos); font-weight: 600; }
 .cls i { color: var(--amber); font-style: normal; font-size: 10px; }
+/* Military plane on a card: the border and a blue wash flash once a second (VJ 10-03). Same
+   specificity as the red overhead pulse and later, so it wins. */
+#now.milflash:not(.idle), #next.milflash:not(.idle) { animation: milflash 1s steps(1, end) infinite; }
+.milflash .mil.on { animation: milflash-tag 1s steps(1, end) infinite; }
+@keyframes milflash { 50% { border-color: #9ad0ff; background: rgba(154,208,255,0.18); box-shadow: 0 0 32px rgba(154,208,255,0.45); } }
+@keyframes milflash-tag { 50% { background: #fff; } }

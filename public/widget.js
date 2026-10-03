@@ -51,7 +51,8 @@ function render() {
     html = `<div class="wl">${down ? 'FLIGHT FEED IS DOWN' : 'CLEAR SKY · LAST 24 H'}</div>`
       + (rows.length ? `<div class="counts">${rows.join('<br>')}</div>` : '');
   }
-  box.className = 'w ' + pick.mode + (box.clientHeight < 320 ? ' compact' : '');
+  // A military plane on the card flashes the tile (VJ 10-03: "make the card or widget flash if its a military plane").
+  box.className = 'w ' + pick.mode + (a && a.mil ? ' milflash' : '') + (box.clientHeight < 320 ? ' compact' : '');
   html = `<div class="in">${html}</div>`;
   const key = box.className + html;
   if (key !== shown) { shown = key; box.innerHTML = html; fit(); }

@@ -32,3 +32,8 @@ body.widgetpage { margin: 0; height: 100vh; overflow: hidden; background: var(--
 /* ?embed=1 (BabyOS cell): square corners, thin padding so the text gets the room; the coloured
    border stays, because it is the state (red overhead, amber next). */
 body.embed .w { border-radius: 0; padding: 2.5vmin 3.5vmin; }
+/* Military plane on the tile: the border and a blue wash flash once a second, over the state colour. */
+.w.milflash { animation: milflash 1s steps(1, end) infinite; }
+.w.milflash .wmil { animation: milflash-tag 1s steps(1, end) infinite; }
+@keyframes milflash { 50% { border-color: #9ad0ff; background: rgba(154,208,255,0.22); } }
+@keyframes milflash-tag { 50% { background: #fff; } }

@@ -187,7 +187,7 @@ function renderPanel(force) {
   const justPassed = bigNow ? null : airborne.filter((a) => a.justPassedS != null && a.justPassedS + age <= S.config.holdS).sort((a, b) => a.justPassedS - b.justPassedS)[0];
   const overhead = bigNow || justPassed;
   const now = $('now');
-  now.className = 'card ' + (bigNow ? '' : justPassed ? 'passed' : 'idle');
+  now.className = 'card ' + (bigNow ? '' : justPassed ? 'passed' : 'idle') + (overhead && overhead.mil ? ' milflash' : ''); // military flashes (VJ 10-03)
   $('o-label').textContent = justPassed ? `JUST PASSED · ${Math.round(justPassed.justPassedS + age)}s ago` : 'OVERHEAD NOW';
   if (overhead) {
     $('o-cs').textContent = overhead.callsign || overhead.reg || overhead.hex;
@@ -213,7 +213,7 @@ function renderPanel(force) {
   const inbound = airborne.filter((a) => a.tier && a.etaS != null && a !== overhead).sort((a, b) => a.etaS - b.etaS);
   const next = inbound[0];
   const card = $('next');
-  card.className = 'card ' + (!next ? 'idle' : next.overheadNow ? 'now' : next.etaS <= S.config.alertLeadS ? 'hot' : '');
+  card.className = 'card ' + (!next ? 'idle' : next.overheadNow ? 'now' : next.etaS <= S.config.alertLeadS ? 'hot' : '') + (next && next.mil ? ' milflash' : '');
   if (next) {
     if (!bigNow && next.tier === 'lookup' && next.etaS - age <= S.config.alertLeadS) document.title = `LOOK UP in ${eta(next)}s`;
     $('n-eta').textContent = eta(next);
