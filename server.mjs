@@ -479,6 +479,14 @@ function handleSettings(req, res) {
 const today = { day: dayKey(), passes: [], marks: [] };
 today.passes = passLog.read(today.day);
 today.marks = markLog.read(today.day);
+// The stats cover the last 24 hours, not the calendar day (VJ 2026-10-02: "the day stats should be a
+// rolling 24"), so a morning glance isn't near-empty. Seeded from yesterday's and today's logs.
+const ROLL_MS = 86400_000;
+const rolling = { passes: [] };
+{
+  const since = Date.now() - ROLL_MS, days = [...new Set([dayKey(new Date(since)), dayKey()])];
+  rolling.passes = days.flatMap((d) => passLog.read(d)).filter((p) => p.at >= since).sort((a, b) => a.at - b.at);
+}
 
 function recordPasses(passes) {
   const k = dayKey();
@@ -486,6 +494,7 @@ function recordPasses(passes) {
   for (const p of passes) {
     passLog.append(p);
     if (dayKey(new Date(p.at)) === today.day) today.passes.push(p);
+    rolling.passes.push(p);
   }
 }
 
@@ -611,11 +620,13 @@ function handleState(res) {
     if (q && !a.typePhoto && !typeFresh(q) && !typeQueue.has(q)) typeQueue.set(q, article ? { article } : { terms: typeQueries(a.info || {}, a.desc), maker: (a.info && a.info.maker) || null });
   }
   hold.annotate(live, Date.now());
-  const sum = summarize(today.passes);
+  const since = Date.now() - ROLL_MS;
+  if (rolling.passes.length && rolling.passes[0].at < since) rolling.passes = rolling.passes.filter((p) => p.at >= since);
+  const sum = summarize(rolling.passes);
   const marks = latestMarks(today.marks);
   const withMarks = (o) => ({ ...o, marks: marks.get(o.hex) || null });
   // The last few passes (any size, so "heard one it didn't flag" can be marked too).
-  const recent = today.passes.slice(-8).reverse()
+  const recent = rolling.passes.slice(-8).reverse()
     .map(({ track, route, ...p }) => withMarks({ ...p, route: route && { from: route.from?.iata, to: route.to?.iata, inferred: route.inferred } }));
   send(res, 200, JSON.stringify({
     ...state,

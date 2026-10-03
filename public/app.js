@@ -206,7 +206,7 @@ function renderPanel(force) {
     }
   } else {
     const l = S.today.last;
-    $('o-last').textContent = l ? `Last: ${l.callsign || l.reg || l.hex} · ${l.type || '?'} · ${fl(l.altFt)} · ${SWF.time(l.at, S.config.tz)}` : 'Nothing overhead yet today.';
+    $('o-last').textContent = l ? `Last: ${l.callsign || l.reg || l.hex} · ${l.type || '?'} · ${fl(l.altFt)} · ${SWF.time(l.at, S.config.tz)}` : 'Nothing overhead in the last 24 h.';
   }
 
   document.title = bigNow ? `LOOK UP · ${overhead.callsign || overhead.type || ''}` : 'see-who-fly';

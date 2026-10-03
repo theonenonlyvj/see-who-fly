@@ -49,7 +49,7 @@ function render() {
       + CLS.filter(([k]) => (k !== 'cargo' && k !== 'heli') || (bc[k] && bc[k].all)).map(([k, label]) => {
         const v = bc[k] || { all: 0, lookup: 0 };
         return `<b>${v.lookup}</b> ${label} <i>of ${v.all}</i>`;
-      }).join('<br>') + '</div><div class="foot">today over the house</div>';
+      }).join('<br>') + '</div><div class="foot">last 24 h over the house</div>';
   }
   box.className = 'w ' + pick.mode + (box.clientHeight < 320 ? ' compact' : '');
   html = `<div class="in">${html}</div>`;
