@@ -16,3 +16,6 @@ body.widgetpage { margin: 0; height: 100vh; overflow: hidden; background: var(--
 .w .counts { font-size: 5vmin; line-height: 1.6; margin-top: 2vmin; }
 .w .counts b { color: var(--phos); }
 .w .counts i { color: var(--amber); font-style: normal; font-size: 4vmin; }
+.w .tags { margin-top: 1.5vmin; font-size: 4.5vmin; display: flex; gap: 2vmin; flex-wrap: wrap; align-items: center; }
+.w .wmil { color: #0b1114; background: #9ad0ff; border-radius: 1vmin; padding: .2vmin 1.5vmin; letter-spacing: .15em; }
+.w .wflown { color: var(--amber); }

@@ -2,7 +2,7 @@
 // No dependencies. Node 18+ (global fetch).
 //
 // Personal data never lives in this repo:
-//   SEE_WHO_FLY_HOME_CONFIG   path to { lat, lon, tz, ground_elev_ft, view_radius_nm, alert_lead_s, overhead_hold_s, lookup_deg, heads_deg, up_deg }
+//   SEE_WHO_FLY_HOME_CONFIG   path to { lat, lon, tz, ground_elev_ft, view_radius_nm, alert_lead_s, overhead_hold_s, lookup_deg, heads_deg, up_deg, home_label }
 //   SEE_WHO_FLY_PLACES        optional path to private reference points [{ name, lat, lon }]
 //   SEE_WHO_FLY_FLIGHTY_DIR   optional dir of Flighty exports; the newest FlightyExport-*.csv is used and re-checked hourly
 //   SEE_WHO_FLY_FLIGHTY_CSV   optional single export (used if no dir is given)
@@ -624,7 +624,7 @@ function handleState(res) {
     // The client gets thresholds and relative positions; it never needs the home coordinates.
     settings,
     // upDeg is only the way the front door faces (for house view), not a location.
-    config: { upDeg: Number.isFinite(cfg.up_deg) ? cfg.up_deg : null, viewRadiusM: VIEW_RADIUS_M, alertLeadS: cfg.alert_lead_s, holdS: cfg.overhead_hold_s, nearM: cfg.near_mi * M_PER_MI, lookupDeg: cfg.lookup_deg, headsDeg: cfg.heads_deg, tz: cfg.tz },
+    config: { upDeg: Number.isFinite(cfg.up_deg) ? cfg.up_deg : null, viewRadiusM: VIEW_RADIUS_M, alertLeadS: cfg.alert_lead_s, holdS: cfg.overhead_hold_s, nearM: cfg.near_mi * M_PER_MI, lookupDeg: cfg.lookup_deg, headsDeg: cfg.heads_deg, tz: cfg.tz, homeLabel: String(cfg.home_label || 'HOME').slice(0, 20) },
     aircraft: live.map(withMarks),
     recent,
     landmarks: LANDMARKS,

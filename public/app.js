@@ -91,7 +91,7 @@ function draw() {
   // Home.
   ctx.fillStyle = '#ffb547'; ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI * 2); ctx.fill();
   ctx.strokeStyle = 'rgba(255,181,71,.25)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(cx, cy, 14, 0, Math.PI * 2); ctx.stroke();
-  ctx.textAlign = 'center'; ctx.fillText('HOME', cx, cy + 26); ctx.textAlign = 'left';
+  ctx.textAlign = 'center'; ctx.fillText(S.config.homeLabel || 'HOME', cx, cy + 26); ctx.textAlign = 'left';
 
   // Aircraft.
   for (const a of S.aircraft) {

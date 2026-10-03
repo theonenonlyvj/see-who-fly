@@ -14,6 +14,9 @@ const route = (r) => {
 const name = (a) => a.callsign || a.reg || a.hex;
 const sub = (a) => [a.route && a.route.airline, route(a.route)].filter(Boolean).join(' · ');
 const meta = (a) => [a.desc || a.type, fl(a.altFt)].filter(Boolean).join(' · ');
+// Tags under the plane: MIL, and whether you've flown it (exact tail, else the flight number) from Flighty.
+const flown = (f) => !f ? '' : f.tailCount ? `✈︎ you've flown this plane ${f.tailCount}×` : f.flightCount ? `✈︎ you've flown this flight ${f.flightCount}×` : '';
+const tags = (a) => (a.mil || flown(a.flown)) ? `<div class="tags">${a.mil ? '<span class="wmil">MIL</span>' : ''}${flown(a.flown) ? `<span class="wflown">${esc(flown(a.flown))}</span>` : ''}</div>` : '';
 const look = (a) => `Look <b>${esc(SWF.where(S, a.lookBearing != null ? a.lookBearing : a.bearing))}</b>, ${Math.round(a.lookElev != null ? a.lookElev : (a.elevation || 0))}° up`;
 const CLS = [['airline', 'airline'], ['privateplus', 'private plus'], ['private', 'private'], ['cargo', 'cargo'], ['heli', 'helicopter'], ['military', 'military']];
 
@@ -29,13 +32,13 @@ function render() {
   const ago = (p) => Math.round(p.sinceLookupS + age);
   let html;
   if (pick.mode === 'now') {
-    html = `<div class="wl">OVERHEAD NOW</div><div class="cs">${esc(name(a))}</div><div class="sub">${esc(sub(a))}</div><div class="meta">${esc(meta(a))}</div><div class="lookw">${look(a)}</div>`
+    html = `<div class="wl">OVERHEAD NOW</div><div class="cs">${esc(name(a))}</div><div class="sub">${esc(sub(a))}</div><div class="meta">${esc(meta(a))}</div>${tags(a)}<div class="lookw">${look(a)}</div>`
       + (pick.other ? `<div class="foot">also ${esc(name(pick.other))}</div>` : '');
   } else if (pick.mode === 'next') {
-    html = `<div class="wl">NEXT · LOOK UP</div><div class="big">${eta(a)}s</div><div class="cs">${esc(name(a))}</div><div class="sub">${esc(sub(a))}</div><div class="meta">${esc(meta(a))}</div><div class="lookw">${look(a)}</div>`
+    html = `<div class="wl">NEXT · LOOK UP</div><div class="big">${eta(a)}s</div><div class="cs">${esc(name(a))}</div><div class="sub">${esc(sub(a))}</div><div class="meta">${esc(meta(a))}</div>${tags(a)}<div class="lookw">${look(a)}</div>`
       + (pick.passed ? `<div class="foot">just passed: ${esc(name(pick.passed))} · ${ago(pick.passed)}s ago</div>` : '');
   } else if (pick.mode === 'passed') {
-    html = `<div class="wl">JUST PASSED · ${ago(a)}s ago</div><div class="cs">${esc(name(a))}</div><div class="sub">${esc(sub(a))}</div><div class="meta">${esc(meta(a))}</div>`
+    html = `<div class="wl">JUST PASSED · ${ago(a)}s ago</div><div class="cs">${esc(name(a))}</div><div class="sub">${esc(sub(a))}</div><div class="meta">${esc(meta(a))}</div>${tags(a)}`
       + (pick.next ? `<div class="foot">next: ${esc(name(pick.next))} in ${eta(pick.next)}s</div>` : '');
   } else {
     const bc = (S.today && S.today.byClass) || {};
