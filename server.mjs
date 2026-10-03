@@ -32,7 +32,8 @@ import { GhostFilter } from './lib/dedupe.mjs';
 import { typeFacts } from './lib/typefacts.mjs';
 import { inferEndpoint } from './lib/infer.mjs';
 import { originFromTrace, mergeTraces } from './lib/origin.mjs';
-import { typeQuery, typeQueries, pickPage, creditFrom } from './lib/typephoto.mjs';
+import { typeQuery, typeQueries, pickPage, creditFrom, creditText } from './lib/typephoto.mjs';
+import { articleFor } from './lib/typearticles.mjs';
 import { DiskCache } from './lib/diskcache.mjs';
 import crypto from 'node:crypto';
 import zlib from 'node:zlib';
@@ -194,9 +195,11 @@ async function originWorker() {
 // second server for another house reuses the same answers. Failures are never saved.
 const DAY = 86400_000;
 const CACHE_DIR = process.env.SEE_WHO_FLY_CACHE_DIR || path.join(os.homedir(), '.see-who-fly', 'cache');
-const disk = { info: new DiskCache(CACHE_DIR, 'info'), photo: new DiskCache(CACHE_DIR, 'photo'), type: new DiskCache(CACHE_DIR, 'type'),
+const disk = { info: new DiskCache(CACHE_DIR, 'info'), photo: new DiskCache(CACHE_DIR, 'photo'), type: new DiskCache(CACHE_DIR, 'type3'), // 'type3': article table + strict search 10-02; older picks discarded
   typeImg: new DiskCache(CACHE_DIR, 'typeimg'), route: new DiskCache(CACHE_DIR, 'route') };
 const IMG_MAX_AGE = 30 * DAY;
+// Folders from older matching rules: their picks are no longer trusted.
+for (const old of ['type', 'type2']) { try { fs.rmSync(path.join(CACHE_DIR, old), { recursive: true, force: true }); } catch {} }
 function pruneDisk() { for (const [k, d] of Object.entries(disk)) d.prune(k === 'photo' || k === 'typeImg' ? IMG_MAX_AGE : 60 * DAY); }
 // Load a saved entry into memory the first time a key is asked about, within the map's size limit.
 // A key with nothing on disk is remembered for 10 minutes, so planes far outside the view don't
@@ -290,15 +293,24 @@ function typePhotoFor(q) {
 async function typeWorker() {
   for (;;) {
     const [q, job] = typeQueue.entries().next().value || [];
-    const { terms, maker } = job || {};
+    const { terms, maker, article } = job || {};
     if (!q) { await sleep(1000); continue; }
     typeQueue.delete(q);
     if (typeFresh(q)) continue;
     let v = null, ttl = 7 * DAY, errored = false;
-    for (const term of terms || [q]) {
+    for (const term of article ? [null] : terms || [q]) {
       try {
-        const search = await getJsonH(`https://en.wikipedia.org/w/api.php?action=query&format=json&generator=search&gsrlimit=1&gsrsearch=${encodeURIComponent(term)}&prop=pageimages|info&piprop=name&inprop=url`);
-        const page = pickPage(search, term, maker);
+        let page;
+        if (article) {
+          // Known type: its own article, no search (lib/typearticles.mjs).
+          const j = await getJsonH(`https://en.wikipedia.org/w/api.php?action=query&format=json&redirects=1&titles=${encodeURIComponent(article)}&prop=pageimages|info&piprop=name&inprop=url`);
+          const p = Object.values((j && j.query && j.query.pages) || {})[0];
+          const title = p && p.pageimage && !('missing' in p) ? creditText(p.title, 60) : null;
+          page = title ? { title, file: String(p.pageimage), page: p.fullurl || null } : null;
+        } else {
+          const search = await getJsonH(`https://en.wikipedia.org/w/api.php?action=query&format=json&generator=search&gsrlimit=1&gsrsearch=${encodeURIComponent(term)}&prop=pageimages|info&piprop=name&inprop=url`);
+          page = pickPage(search, term, maker);
+        }
         if (!page) continue;
         const info = await getJsonH(`https://en.wikipedia.org/w/api.php?action=query&format=json&titles=${encodeURIComponent('File:' + page.file)}&prop=imageinfo&iiprop=extmetadata|url&iiurlwidth=500`);
         const c = creditFrom(info);
@@ -591,9 +603,12 @@ function handleState(res) {
     a.route = a.onGround ? null : routeFor(a.callsign, a, a.hex); a.info = infoFor(a.hex);
     // No photo of its own and not an everyday airliner: show what its type looks like.
     // Waits for the plane's own lookup, so a plane with its own photo never shows a type photo first.
-    const q = !a.onGround && !a.commonAirliner && infoFresh(a.hex) && !(a.info && a.info.photo) ? typeQuery(a.info || {}, a.desc) : null;
+    // A known type code goes to its own article; anything else to a strict search.
+    const want = !a.onGround && !a.commonAirliner && infoFresh(a.hex) && !(a.info && a.info.photo);
+    const article = want ? articleFor(a.type) : null;
+    const q = want ? (article ? `article:${article}` : typeQuery(a.info || {}, a.desc)) : null;
     a.typePhoto = typePhotoFor(q);
-    if (q && !a.typePhoto && !typeFresh(q) && !typeQueue.has(q)) typeQueue.set(q, { terms: typeQueries(a.info || {}, a.desc), maker: (a.info && a.info.maker) || null });
+    if (q && !a.typePhoto && !typeFresh(q) && !typeQueue.has(q)) typeQueue.set(q, article ? { article } : { terms: typeQueries(a.info || {}, a.desc), maker: (a.info && a.info.maker) || null });
   }
   hold.annotate(live, Date.now());
   const sum = summarize(today.passes);
