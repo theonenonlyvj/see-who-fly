@@ -20,6 +20,10 @@ test('backup search: the first hit counts only if it is unmistakably the same ty
   // VJ 2026-10-02 19:40: N600FX, a Praetor 600 (registry Embraer / EMB-550), showed a Bandeirante.
   no('Embraer EMB 110 Bandeirante', 'Embraer EMB-550', 'Embraer');
   no('Embraer EMB 110 Bandeirante', 'EMBRAER EMB-550 Praetor 600');
+  // 10-03 cache check: 'Boeing 737-8' took the groundings article (a photo of parked, grounded jets).
+  no('Boeing 737 MAX groundings', 'Boeing 737-8', 'Boeing');
+  no('Boeing 737 MAX groundings', 'Boeing 737-8');
+  no('Boeing 737 MAX groundings', 'BOEING 737 MAX 8');
   // Company articles, siblings, stray pages.
   no('Cessna', 'Cessna 208 Caravan');
   no('Pilatus Aircraft', 'Pilatus PC-12');
