@@ -179,7 +179,7 @@ function renderPanel(force) {
   // Old TV time-zone data may reject the zone: never let the clock take the panel down.
   try { $('clock').textContent = new Date().toLocaleTimeString('en-US', { hour12: false, timeZone: S.config.tz }); }
   catch (e) { $('clock').textContent = new Date().toLocaleTimeString('en-US', { hour12: false }); }
-  $('boxline').textContent = `LOOK UP ≥ ${S.config.lookupDeg}° · heads-up ≥ ${S.config.headsDeg}° · alert ${S.config.alertLeadS}s · ${(S.config.viewRadiusM / M_PER_NM).toFixed(0)} nm`;
+  $('boxline').textContent = `LOOK UP ≥ ${S.config.lookupDeg}°${S.config.widebodyLookupDeg != null ? ` (widebody ≥ ${S.config.widebodyLookupDeg}°)` : ""} · heads-up ≥ ${S.config.headsDeg}° · alert ${S.config.alertLeadS}s · ${(S.config.viewRadiusM / M_PER_NM).toFixed(0)} nm`;
 
   const airborne = S.aircraft.filter((a) => !a.onGround);
   const bigNow = airborne.filter((a) => a.overheadNow).sort((a, b) => a.distM - b.distM)[0];

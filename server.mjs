@@ -2,7 +2,7 @@
 // No dependencies. Node 18+ (global fetch).
 //
 // Personal data never lives in this repo:
-//   SEE_WHO_FLY_HOME_CONFIG   path to { lat, lon, tz, ground_elev_ft, view_radius_nm, alert_lead_s, overhead_hold_s, lookup_deg, heads_deg, up_deg, home_label }
+//   SEE_WHO_FLY_HOME_CONFIG   path to { lat, lon, tz, ground_elev_ft, view_radius_nm, alert_lead_s, overhead_hold_s, lookup_deg, heads_deg, widebody_lookup_deg, up_deg, home_label }
 //   SEE_WHO_FLY_PLACES        optional path to private reference points [{ name, lat, lon }]
 //   SEE_WHO_FLY_FLIGHTY_DIR   optional dir of Flighty exports; the newest FlightyExport-*.csv is used and re-checked hourly
 //   SEE_WHO_FLY_FLIGHTY_CSV   optional single export (used if no dir is given)
@@ -80,7 +80,8 @@ const AIRPORTS = PLACES.filter((p) => p.iata).map((p) => ({ iata: clean(p.iata, 
 // ---------- per-aircraft description ----------
 // "Worth looking up?" is decided by how big the plane will look (wingspan over 3-D distance), not by a
 // fixed box: see lib/visibility.mjs. Tiers: 'lookup' (red) and 'heads' (amber); everything else is radar only.
-const LOOK = { groundFt: cfg.ground_elev_ft, lookupDeg: cfg.lookup_deg, headsDeg: cfg.heads_deg, horizonS: 240 };
+const WIDE_DEG = Number.isFinite(cfg.widebody_lookup_deg) ? cfg.widebody_lookup_deg : null; // optional per-house line for twin-aisles
+const LOOK = { groundFt: cfg.ground_elev_ft, lookupDeg: cfg.lookup_deg, headsDeg: cfg.heads_deg, horizonS: 240, widebodyLookupDeg: WIDE_DEG };
 
 
 function describe(ac, now) {
@@ -448,7 +449,7 @@ const dayKey = (d = new Date()) => new Intl.DateTimeFormat('en-CA', { timeZone: 
 const DATA_DIR = process.env.SEE_WHO_FLY_DATA_DIR || path.join(os.homedir(), '.see-who-fly', 'data');
 fs.mkdirSync(DATA_DIR, { recursive: true });
 const passLog = new PassLog(DATA_DIR, dayKey);
-const tracker = new PassTracker({ logWithinM: cfg.log_within_mi * M_PER_MI, closeAfterS: 30, groundFt: cfg.ground_elev_ft, lookupDeg: cfg.lookup_deg, headsDeg: cfg.heads_deg });
+const tracker = new PassTracker({ logWithinM: cfg.log_within_mi * M_PER_MI, closeAfterS: 30, groundFt: cfg.ground_elev_ft, lookupDeg: cfg.lookup_deg, headsDeg: cfg.heads_deg, widebodyLookupDeg: WIDE_DEG });
 const markLog = new MarkLog(DATA_DIR, dayKey);
 
 // ---------- settings (one set for every screen; changed from the unlinked /settings page) ----------
@@ -635,7 +636,7 @@ function handleState(res) {
     // The client gets thresholds and relative positions; it never needs the home coordinates.
     settings,
     // upDeg is only the way the front door faces (for house view), not a location.
-    config: { upDeg: Number.isFinite(cfg.up_deg) ? cfg.up_deg : null, viewRadiusM: VIEW_RADIUS_M, alertLeadS: cfg.alert_lead_s, holdS: cfg.overhead_hold_s, nearM: cfg.near_mi * M_PER_MI, lookupDeg: cfg.lookup_deg, headsDeg: cfg.heads_deg, tz: cfg.tz, homeLabel: String(cfg.home_label || 'HOME').slice(0, 20) },
+    config: { upDeg: Number.isFinite(cfg.up_deg) ? cfg.up_deg : null, viewRadiusM: VIEW_RADIUS_M, alertLeadS: cfg.alert_lead_s, holdS: cfg.overhead_hold_s, nearM: cfg.near_mi * M_PER_MI, lookupDeg: cfg.lookup_deg, headsDeg: cfg.heads_deg, widebodyLookupDeg: WIDE_DEG, tz: cfg.tz, homeLabel: String(cfg.home_label || 'HOME').slice(0, 20) },
     aircraft: live.map(withMarks),
     recent,
     landmarks: LANDMARKS,
