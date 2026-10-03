@@ -45,11 +45,10 @@ function render() {
       + (pick.next ? `<div class="foot">next: ${esc(name(pick.next))} in ${eta(pick.next)}s</div>` : '');
   } else {
     const bc = (S.today && S.today.byClass) || {};
-    html = `<div class="wl">${down ? 'FLIGHT FEED IS DOWN' : 'CLEAR SKY'}</div><div class="counts">`
-      + CLS.filter(([k]) => (k !== 'cargo' && k !== 'heli') || (bc[k] && bc[k].all)).map(([k, label]) => {
-        const v = bc[k] || { all: 0, lookup: 0 };
-        return `<b>${v.lookup}</b> ${label} <i>of ${v.all}</i>`;
-      }).join('<br>') + '</div><div class="foot">last 24 h over the house</div>';
+    // Only classes with at least one overhead pass in the last 24 h (VJ 10-02: hide the "0" rows).
+    const rows = CLS.filter(([k]) => bc[k] && bc[k].lookup).map(([k, label]) => `<b>${bc[k].lookup}</b> ${label} <i>of ${bc[k].all}</i>`);
+    html = `<div class="wl">${down ? 'FLIGHT FEED IS DOWN' : 'CLEAR SKY · LAST 24 H'}</div>`
+      + (rows.length ? `<div class="counts">${rows.join('<br>')}</div>` : '');
   }
   box.className = 'w ' + pick.mode + (box.clientHeight < 320 ? ' compact' : '');
   html = `<div class="in">${html}</div>`;
