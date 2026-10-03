@@ -12,10 +12,11 @@ const route = (r) => {
   return r.from || r.to ? `${end(r.from)} → ${end(r.to)}` : '';
 };
 const name = (a) => a.callsign || a.reg || a.hex;
-const sub = (a) => [a.route && a.route.airline, route(a.route)].filter(Boolean).join(' · ');
-const meta = (a) => [a.desc || a.type, fl(a.altFt)].filter(Boolean).join(' · ');
+const sub = (a) => [route(a.route), a.route && a.route.airline].filter(Boolean).join(' · '); // route first: it survives a cut
+// Altitude first: on a narrow tile the end of a long type name is what gets cut, never the height.
+const meta = (a) => [fl(a.altFt), a.desc || a.type].filter(Boolean).join(' · ');
 // Tags under the plane: MIL, and whether you've flown it (exact tail, else the flight number) from Flighty.
-const flown = (f) => !f ? '' : f.tailCount ? `✈︎ you've flown this plane ${f.tailCount}×` : f.flightCount ? `✈︎ you've flown this flight ${f.flightCount}×` : '';
+const flown = (f) => !f ? '' : f.tailCount ? `✈︎ flew this plane ${f.tailCount}×` : f.flightCount ? `✈︎ flew this flight ${f.flightCount}×` : '';
 const tags = (a) => (a.mil || flown(a.flown)) ? `<div class="tags">${a.mil ? '<span class="wmil">MIL</span>' : ''}${flown(a.flown) ? `<span class="wflown">${esc(flown(a.flown))}</span>` : ''}</div>` : '';
 const look = (a) => `Look <b>${esc(SWF.where(S, a.lookBearing != null ? a.lookBearing : a.bearing))}</b>, ${Math.round(a.lookElev != null ? a.lookElev : (a.elevation || 0))}° up`;
 const CLS = [['airline', 'airline'], ['privateplus', 'private plus'], ['private', 'private'], ['cargo', 'cargo'], ['heli', 'helicopter'], ['military', 'military']];
@@ -49,8 +50,28 @@ function render() {
       }).join('<br>') + '</div><div class="foot">today over the house</div>';
   }
   box.className = 'w ' + pick.mode;
-  box.innerHTML = html;
+  html = `<div class="in">${html}</div>`;
+  if (html !== shown) { shown = html; box.innerHTML = html; fit(); }
 }
+// Text as large as the box allows: the biggest base size at which the content still fits, so a
+// wide tile, a tall one and a sparse state (clear sky) all fill their space. Capped so a near-empty
+// card doesn't turn into a billboard.
+function fit() {
+  const inner = box.firstChild;
+  if (!inner) return;
+  const cs = getComputedStyle(box);
+  const H = box.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+  const vmin = Math.min(innerWidth, innerHeight) / 100;
+  let lo = 0.3 * vmin, hi = 2.4 * vmin;
+  for (let i = 0; i < 14; i++) {
+    const mid = (lo + hi) / 2;
+    box.style.fontSize = mid + 'px';
+    if (inner.scrollHeight <= H * 0.94 && inner.scrollWidth <= inner.clientWidth + 1) lo = mid; else hi = mid;
+  }
+  box.style.fontSize = lo + 'px';
+}
+let shown = '';
+addEventListener('resize', fit);
 async function tick() {
   try {
     S = await (await fetch('/api/state', { cache: 'no-store' })).json(); fetchedAt = Date.now();
