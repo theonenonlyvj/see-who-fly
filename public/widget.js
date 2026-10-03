@@ -38,7 +38,8 @@ function render() {
     html = `<div class="wl">OVERHEAD NOW</div><div class="cs">${esc(name(a))}</div><div class="sub">${esc(sub(a))}</div><div class="meta">${esc(meta(a))}</div>${tags(a)}<div class="lookw">${look(a)}</div>`
       + (pick.other ? `<div class="foot">also ${esc(name(pick.other))}</div>` : '');
   } else if (pick.mode === 'next') {
-    html = `<div class="wl">NEXT · LOOK UP</div><div class="big">${eta(a)}s</div><div class="cs">${esc(name(a))}</div><div class="sub">${esc(sub(a))}</div><div class="meta">${esc(meta(a))}</div>${tags(a)}<div class="lookw">${look(a)}</div>`
+    // No title: the amber countdown says "next" on its own (VJ 10-02: "waste of space").
+    html = `<div class="big">${eta(a)}s</div><div class="cs">${esc(name(a))}</div><div class="sub">${esc(sub(a))}</div><div class="meta">${esc(meta(a))}</div>${tags(a)}<div class="lookw">${look(a)}</div>`
       + (pick.passed ? `<div class="foot">just passed: ${esc(name(pick.passed))} · ${ago(pick.passed)}s ago</div>` : '');
   } else if (pick.mode === 'passed') {
     html = `<div class="wl">JUST PASSED · ${ago(a)}s ago</div><div class="cs">${esc(name(a))}</div><div class="sub">${esc(sub(a))}</div><div class="meta">${esc(meta(a))}</div>${tags(a)}`
