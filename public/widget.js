@@ -49,9 +49,10 @@ function render() {
         return `<b>${v.lookup}</b> ${label} <i>of ${v.all}</i>`;
       }).join('<br>') + '</div><div class="foot">today over the house</div>';
   }
-  box.className = 'w ' + pick.mode;
+  box.className = 'w ' + pick.mode + (box.clientHeight < 320 ? ' compact' : '');
   html = `<div class="in">${html}</div>`;
-  if (html !== shown) { shown = html; box.innerHTML = html; fit(); }
+  const key = box.className + html;
+  if (key !== shown) { shown = key; box.innerHTML = html; fit(); }
 }
 // Text as large as the box allows: the biggest base size at which the content still fits, so a
 // wide tile, a tall one and a sparse state (clear sky) all fill their space. Capped so a near-empty

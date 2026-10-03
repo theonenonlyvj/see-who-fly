@@ -8,7 +8,7 @@ body.widgetpage { margin: 0; height: 100vh; overflow: hidden; background: var(--
 .w .cs { font-size: 13em; line-height: 1.1; margin-top: .1em; white-space: nowrap; }
 .w .sub { font-size: 6.5em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--phos); margin-top: .2em; }
 .w .meta { font-size: 6em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--dim); margin-top: .2em; }
-.w .lookw { font-size: 7.5em; margin-top: .3em; white-space: nowrap; }
+.w .lookw { font-size: 7.5em; line-height: 1.15; margin-top: .3em; }
 .w .lookw b { color: var(--amber); }
 .w .foot { font-size: 5.5em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--dim); margin-top: .5em; }
 .w.now { border-color: var(--red); }
@@ -18,6 +18,14 @@ body.widgetpage { margin: 0; height: 100vh; overflow: hidden; background: var(--
 .w .counts { font-size: 6.5em; white-space: nowrap; line-height: 1.5; margin-top: .3em; }
 .w .counts b { color: var(--phos); }
 .w .counts i { color: var(--amber); font-style: normal; font-size: .8em; }
-.w .tags { margin-top: .3em; font-size: 6em; display: flex; flex-wrap: wrap; gap: .2em .5em; white-space: nowrap; align-items: center; }
+.w .tags { margin-top: .3em; font-size: 6em; display: flex; gap: .5em; white-space: nowrap; overflow: hidden; align-items: center; }
 .w .wmil { color: #0b1114; background: #9ad0ff; border-radius: .2em; padding: 0 .3em; letter-spacing: .15em; }
-.w .wflown { color: var(--amber); }
+.w .wflown { color: var(--amber); overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.w .wmil { flex: none; }
+/* The plane overhead right now is the hero. */
+.w.now .cs { font-size: 17em; }
+.w.now .lookw { font-size: 9em; }
+/* Small tiles (the BabyOS dashboard cell is about 244x193): drop the type/altitude line and the
+   footer so what's left can be big. */
+.w.compact .meta, .w.compact .foot { display: none; }
+.w.compact .wl { letter-spacing: .08em; }
