@@ -87,3 +87,16 @@ test('summarize re-classifies logged passes so rule fixes count today; a logged 
   assert.equal(s.byClass.airline.all, 0);
   assert.equal(s.byClass.heli.all, 1);
 });
+
+test('a mystery (anonymous radar-only) pass keeps its tag in the pass log', () => {
+  const t = new PassTracker({ logWithinM: 805, closeAfterS: 30 });
+  const m = (o) => ac({ hex: '~abcdef', callsign: '', type: null, reg: null, mil: false, mystery: true, altFt: 1500, ...o });
+  let out = [];
+  out.push(...t.update([m({ x: 10, y: -600 })], 0));
+  out.push(...t.update([m({ x: 10, y: 300 })], 5000));
+  out.push(...t.update([m({ x: 10, y: 3000 })], 40000));
+  out.push(...t.update([], 90000));
+  assert.equal(out.length, 1);
+  assert.equal(out[0].mystery, true);
+  assert.equal(out[0].mil, false);
+});

@@ -17,9 +17,9 @@ const name = (a) => a.callsign || a.reg || a.hex;
 const sub = (a) => [route(a.route), a.route && a.route.airline].filter(Boolean).join(' · '); // route first: it survives a cut
 // Altitude first: on a narrow tile the end of a long type name is what gets cut, never the height.
 const meta = (a) => [fl(a.altFt), a.desc || a.type].filter(Boolean).join(' · ');
-// Tags under the plane: MIL, and whether you've flown it (exact tail, else the flight number) from Flighty.
+// Tags under the plane: MIL or MYSTERY (anonymous radar-only track), and whether you've flown it (exact tail, else the flight number) from Flighty.
 const flown = (f) => !f ? '' : f.tailCount ? `✈︎ flew this plane ${f.tailCount}×` : f.flightCount ? `✈︎ flew this flight ${f.flightCount}×` : '';
-const tags = (a) => (a.mil || flown(a.flown)) ? `<div class="tags">${a.mil ? '<span class="wmil">MIL</span>' : ''}${flown(a.flown) ? `<span class="wflown">${esc(flown(a.flown))}</span>` : ''}</div>` : '';
+const tags = (a) => (a.mil || a.mystery || flown(a.flown)) ? `<div class="tags">${a.mil ? '<span class="wmil">MIL</span>' : ''}${a.mystery ? '<span class="wmys">MYSTERY</span>' : ''}${flown(a.flown) ? `<span class="wflown">${esc(flown(a.flown))}</span>` : ''}</div>` : '';
 const look = (a) => `Look <b>${esc(SWF.where(S, a.lookBearing != null ? a.lookBearing : a.bearing))}</b>, ${Math.round(a.lookElev != null ? a.lookElev : (a.elevation || 0))}° up`;
 const CLS = [['airline', 'airline'], ['privateplus', 'private plus'], ['private', 'private'], ['cargo', 'cargo'], ['heli', 'helicopter'], ['military', 'military']];
 
@@ -51,8 +51,9 @@ function render() {
     html = `<div class="wl">${down ? 'FLIGHT FEED IS DOWN' : 'CLEAR SKY · LAST 24 H'}</div>`
       + (rows.length ? `<div class="counts">${rows.join('<br>')}</div>` : '');
   }
-  // A military plane on the card flashes the tile (VJ 10-03: "make the card or widget flash if its a military plane").
-  box.className = 'w ' + pick.mode + (a && a.mil ? ' milflash' : '') + (box.clientHeight < 320 ? ' compact' : '');
+  // A military plane on the card flashes the tile (VJ 10-03: "make the card or widget flash if its a military plane");
+  // a mystery track flashes the same way in violet (VJ 10-16: "same behavior like military").
+  box.className = 'w ' + pick.mode + (a && a.mil ? ' milflash' : a && a.mystery ? ' mysflash' : '') + (box.clientHeight < 320 ? ' compact' : '');
   html = `<div class="in">${html}</div>`;
   const key = box.className + html;
   if (key !== shown) { shown = key; box.innerHTML = html; fit(); }

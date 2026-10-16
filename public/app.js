@@ -187,11 +187,12 @@ function renderPanel(force) {
   const justPassed = bigNow ? null : airborne.filter((a) => a.justPassedS != null && a.justPassedS + age <= S.config.holdS).sort((a, b) => a.justPassedS - b.justPassedS)[0];
   const overhead = bigNow || justPassed;
   const now = $('now');
-  now.className = 'card ' + (bigNow ? '' : justPassed ? 'passed' : 'idle') + (overhead && overhead.mil ? ' milflash' : ''); // military flashes (VJ 10-03)
+  now.className = 'card ' + (bigNow ? '' : justPassed ? 'passed' : 'idle') + (overhead && overhead.mil ? ' milflash' : overhead && overhead.mystery ? ' mysflash' : ''); // military flashes (VJ 10-03)
   $('o-label').textContent = justPassed ? `JUST PASSED · ${Math.round(justPassed.justPassedS + age)}s ago` : 'OVERHEAD NOW';
   if (overhead) {
     $('o-cs').textContent = overhead.callsign || overhead.reg || overhead.hex;
-    $('o-mil').className = 'mil' + (overhead.mil ? ' on' : '');
+    $('o-mil').className = 'mil' + (overhead.mil ? ' on' : overhead.mystery ? ' on mys' : '');
+    $('o-mil').textContent = !overhead.mil && overhead.mystery ? 'MYSTERY' : 'MIL';
     $('o-route').textContent = [overhead.route && overhead.route.airline, routeTxt(overhead.route)].filter(Boolean).join(' · ');
     $('o-meta').textContent = [overhead.desc || overhead.type, overhead.reg, liveLine(overhead)].filter(Boolean).join(' · ');
     $('o-facts').textContent = factsLine(overhead);
@@ -213,13 +214,14 @@ function renderPanel(force) {
   const inbound = airborne.filter((a) => a.tier && a.etaS != null && a !== overhead).sort((a, b) => a.etaS - b.etaS);
   const next = inbound[0];
   const card = $('next');
-  card.className = 'card ' + (!next ? 'idle' : next.overheadNow ? 'now' : next.etaS <= S.config.alertLeadS ? 'hot' : '') + (next && next.mil ? ' milflash' : '');
+  card.className = 'card ' + (!next ? 'idle' : next.overheadNow ? 'now' : next.etaS <= S.config.alertLeadS ? 'hot' : '') + (next && next.mil ? ' milflash' : next && next.mystery ? ' mysflash' : '');
   if (next) {
     if (!bigNow && next.tier === 'lookup' && next.etaS - age <= S.config.alertLeadS) document.title = `LOOK UP in ${eta(next)}s`;
     $('n-eta').textContent = eta(next);
     $('n-tier').textContent = next.tier === 'lookup' ? 'LOOK UP' : 'heads-up · small';
     $('n-cs').textContent = `${next.callsign || next.reg || next.hex}`;
-    $('n-mil').className = 'mil' + (next.mil ? ' on' : '');
+    $('n-mil').className = 'mil' + (next.mil ? ' on' : next.mystery ? ' on mys' : '');
+    $('n-mil').textContent = !next.mil && next.mystery ? 'MYSTERY' : 'MIL';
     $('n-route').textContent = [next.route && next.route.airline, routeTxt(next.route)].filter(Boolean).join(' · ');
     $('n-meta').textContent = [next.desc || next.type, next.reg, liveLine(next)].filter(Boolean).join(' · ');
     $('n-facts').textContent = factsLine(next);
@@ -234,7 +236,7 @@ function renderPanel(force) {
   const rows = inbound.slice(1, 8);
   $('queue').innerHTML = rows.map((a) => `<li class="${a.tier === 'heads' ? 'miss' : ''}">
       <span class="t">${eta(a)}s</span>
-      <span>${esc(a.callsign || a.reg || a.hex)} <span class="r">${esc(a.type || '')} ${fl(a.altFt)} ${esc(routeTxt(a.route))}${a.tier === 'heads' ? ' · small' : ''}${a.flown ? ' · ✈︎ flown' : ''}${a.mil ? ' · MIL' : ''}</span></span>
+      <span>${esc(a.callsign || a.reg || a.hex)} <span class="r">${esc(a.type || '')} ${fl(a.altFt)} ${esc(routeTxt(a.route))}${a.tier === 'heads' ? ' · small' : ''}${a.flown ? ' · ✈︎ flown' : ''}${a.mil ? ' · MIL' : ''}${a.mystery ? ' · MYSTERY' : ''}</span></span>
       <span class="r">${SWF.where(S, a.bearing)}</span></li>`).join('');
 
   $('s-count').textContent = S.today.overheadCount;

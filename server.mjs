@@ -26,7 +26,7 @@ import { loadPlaces, placesInView } from './lib/places.mjs';
 import { newestExport, loadFlighty, flownMatch } from './lib/flighty.mjs';
 import { PassTracker, PassLog, summarize } from './lib/passlog.mjs';
 import { chainFromVrs, pickLeg, chainToDisk, chainFromDisk } from './lib/routes.mjs';
-import { classify, isCommonAirliner } from './lib/classify.mjs';
+import { classify, isCommonAirliner, isMystery } from './lib/classify.mjs';
 import { OverheadHold } from './lib/hold.mjs';
 import { GhostFilter } from './lib/dedupe.mjs';
 import { typeFacts } from './lib/typefacts.mjs';
@@ -105,6 +105,8 @@ function describe(ac, now) {
     hex: ac.hex.toLowerCase(), callsign, reg: clean(ac.r), type: clean(ac.t, 4), desc: cleanText(ac.desc),
     category: clean(ac.category, 2), squawk: clean(ac.squawk, 4), emergency: ac.emergency && ac.emergency !== 'none' ? clean(ac.emergency, 12) : null,
     mil: ((ac.dbFlags ?? 0) & 1) === 1,
+    // Mystery: an airborne radar-only track with no identity (lib/classify.mjs); flashes like military.
+    mystery: isMystery({ hex: ac.hex, callsign, reg: clean(ac.r), type, mil, onGround }),
     x: p.x, y: p.y, distM, bearing, elevation,
     altFt, onGround, gs: ac.gs ?? null, track: ac.track ?? null, vrate,
     posAge: ac.seen_pos ?? null,

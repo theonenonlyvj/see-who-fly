@@ -87,3 +87,12 @@ test('photos: only everyday airliners are "common"; the unusual planes keep thei
   assert.equal(common('EJA17', 'C56X'), false);    // business jet
   assert.equal(common('FAMUS18', 'C17', true), false);
 });
+
+test('mystery: an airborne radar-only (~) track with no identity; never military, ground or identified', async () => {
+  const { isMystery } = await import('../lib/classify.mjs');
+  assert.equal(isMystery({ hex: '~abcdef', callsign: '', reg: null, type: null, mil: false, onGround: false }), true);
+  assert.equal(isMystery({ hex: '~abcdef', callsign: '', reg: null, type: null, mil: false, onGround: true }), false);
+  assert.equal(isMystery({ hex: '~abcdef', callsign: '', reg: null, type: null, mil: true, onGround: false }), false);
+  assert.equal(isMystery({ hex: '~abcdef', callsign: 'N123AB', reg: null, type: null, mil: false, onGround: false }), false);
+  assert.equal(isMystery({ hex: 'a1b2c3', callsign: '', reg: null, type: null, mil: false, onGround: false }), false);
+});

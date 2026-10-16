@@ -23,7 +23,7 @@ function card(p, kind) {
   const route = !p.route ? '' : p.route.inferred === 'landing' ? ` · ${p.route.from ? end(p.route.from) + ' ' : ''}→ ${end(p.route.to)} (landing)` : p.route.inferred === 'origin' ? ` · from ${end(p.route.from)}` : p.route.inferred === 'departing' ? ` · ${end(p.route.from)} → (departing)` : (p.route.from || p.route.to) ? ` · ${end(p.route.from)}→${end(p.route.to)}` : '';
   const dirn = kind === 'soon' ? `<div class="dirn">Look <b>${SWF.where(S, p.lookBearing != null ? p.lookBearing : p.bearing)}</b>, ${Math.round(p.lookElev != null ? p.lookElev : (p.elevation != null ? p.elevation : 0))}° up</div>` : '';
   return `<div class="lk ${kind}"><div class="when">${when}${p.tier === 'heads' ? ' · small' : ''}</div>
-    <div class="cs">${esc(p.callsign || p.reg || p.hex)}${p.mil ? ' <span class="mil on">MIL</span>' : ''}</div>
+    <div class="cs">${esc(p.callsign || p.reg || p.hex)}${p.mil ? ' <span class="mil on">MIL</span>' : p.mystery ? ' <span class="mil on mys">MYSTERY</span>' : ''}</div>
     <div class="meta">${esc(p.type || '?')} · ${fl(p.altFt)}${esc(route)}</div>${dirn}${SWF.markRow(p)}</div>`;
 }
 

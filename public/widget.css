@@ -21,7 +21,7 @@ body.widgetpage { margin: 0; height: 100vh; overflow: hidden; background: var(--
 .w .tags { margin-top: .3em; font-size: 6em; display: flex; gap: .5em; white-space: nowrap; overflow: hidden; align-items: center; }
 .w .wmil { color: #0b1114; background: #9ad0ff; border-radius: .2em; padding: 0 .3em; letter-spacing: .15em; }
 .w .wflown { color: var(--amber); overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.w .wmil { flex: none; }
+.w .wmil, .w .wmys { flex: none; }
 /* The plane overhead right now is the hero. */
 .w.now .cs { font-size: 17em; }
 .w.now .lookw { font-size: 9em; }
@@ -37,3 +37,8 @@ body.embed .w { border-radius: 0; padding: 2.5vmin 3.5vmin; }
 .w.milflash .wmil { animation: milflash-tag 1s steps(1, end) infinite; }
 @keyframes milflash { 50% { border-color: #9ad0ff; background: rgba(154,208,255,0.22); } }
 @keyframes milflash-tag { 50% { background: #fff; } }
+/* Mystery (anonymous radar-only track, VJ 10-16): the same flash as military, in violet. */
+.w .wmys { color: #0b1114; background: #d6a6ff; border-radius: .2em; padding: 0 .3em; letter-spacing: .15em; }
+.w.mysflash { animation: mysflash 1s steps(1, end) infinite; }
+.w.mysflash .wmys { animation: milflash-tag 1s steps(1, end) infinite; }
+@keyframes mysflash { 50% { border-color: #d6a6ff; background: rgba(214,166,255,0.22); } }

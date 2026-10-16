@@ -125,3 +125,8 @@ header p { margin: 4px 0 0; font-size: 11px; }
 .milflash .mil.on { animation: milflash-tag 1s steps(1, end) infinite; }
 @keyframes milflash { 50% { border-color: #9ad0ff; background: rgba(154,208,255,0.18); box-shadow: 0 0 32px rgba(154,208,255,0.45); } }
 @keyframes milflash-tag { 50% { background: #fff; } }
+/* Mystery (anonymous radar-only track, VJ 10-16): the same flash as military, in violet. */
+.mil.mys { background: #d6a6ff; }
+#now.mysflash:not(.idle), #next.mysflash:not(.idle) { animation: mysflash 1s steps(1, end) infinite; }
+.mysflash .mil.on { animation: milflash-tag 1s steps(1, end) infinite; }
+@keyframes mysflash { 50% { border-color: #d6a6ff; background: rgba(214,166,255,0.18); box-shadow: 0 0 32px rgba(214,166,255,0.45); } }
