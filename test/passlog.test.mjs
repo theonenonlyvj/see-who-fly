@@ -100,3 +100,14 @@ test('a mystery (anonymous radar-only) pass keeps its tag in the pass log', () =
   assert.equal(out[0].mystery, true);
   assert.equal(out[0].mil, false);
 });
+
+test('a "~" track that never moves is not logged; one that moves keeps its points from first sight', () => {
+  const t = new PassTracker({ logWithinM: 805, closeAfterS: 30 });
+  for (let k = 0; k < 10; k++) t.update([{ hex: '~abcdef', x: 50 + k, y: 50, altFt: 1600, still: true }], k * 2000);
+  assert.deepEqual(t.update([], 60_000), []);
+  const u = new PassTracker({ logWithinM: 805, closeAfterS: 30 });
+  u.update([{ hex: '~123456', x: 0, y: 20, altFt: 2000, still: true }], 0);       // first seen right overhead, not yet proven
+  u.update([{ hex: '~123456', x: 120, y: 20, altFt: 2000 }], 2000);              // moved: proven
+  const [p] = u.update([], 40_000);
+  assert.equal(p.cpaM, 20); assert.equal(p.track[0][1], 0);
+});

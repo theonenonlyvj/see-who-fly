@@ -86,3 +86,10 @@ test('sinceLookupS counts from when it stopped looking big, even while it is sti
   l = h.apply([{ hex: 'a', overheadNow: false, nowDeg: 0.5 }], 100_000);
   assert.equal(l[0].sinceLookupS, 100);                                              // kept past holdS for the widget's 90 s rule
 });
+
+test('an unmoved "~" track never reads as just passed', () => {
+  const h = new OverheadHold({ holdS: 300 });
+  h.track([{ hex: '~abcdef', overheadNow: true, nowDeg: 3 }], 0);
+  const [a] = h.annotate([{ hex: '~abcdef', still: true, overheadNow: false, tier: null }], 10_000);
+  assert.equal(a.justPassedS, null); assert.equal(a.passedLookup, false);
+});

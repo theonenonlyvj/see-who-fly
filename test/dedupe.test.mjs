@@ -40,3 +40,25 @@ test('a real non-ADS-B plane on the same path but at its own altitude stays; no 
   const junkNoMotion = { hex: '~ffffff', x: 200, y: 100, altFt: 0, gs: null, track: null };  // junk altitude, right on top
   assert.equal(new GhostFilter().apply([real, junkNoMotion], 0).length, 1);
 });
+
+test('a "~" track parked at one spot never alarms; a moving one does after it moves', () => {
+  const f = new GhostFilter();
+  // Shape of the 10-21 home case: ~600 m out at 1,625 ft, jittering a few metres for 20 s.
+  const parked = (t, dx) => ({ hex: '~abcdef', x: -314 + dx, y: 522, altFt: 1625, gs: null, track: null, mystery: true, tier: 'lookup', overheadNow: true, etaS: 0, nowDeg: 2.05, peakDeg: 2.05 });
+  for (const [t, dx] of [[0, 0], [2000, 2], [10000, 30], [36000, 37]]) {
+    const [a] = f.apply([parked(t, dx)], t);
+    assert.equal(a.still, true); assert.equal(a.mystery, false); assert.equal(a.tier, null); assert.equal(a.overheadNow, false); assert.equal(a.nowDeg, null);
+  }
+  const plane = (x) => ({ hex: '~123456', x, y: 0, altFt: 3000, gs: 120, track: 90, mystery: true, tier: 'lookup', overheadNow: true, nowDeg: 2 });
+  assert.equal(f.apply([plane(-1000)], 0)[0].still, true);           // first sighting: not yet proven
+  const [moved] = f.apply([plane(-940)], 2000);                       // 60 m: still not
+  assert.equal(moved.still, true);
+  const [proven] = f.apply([plane(-760)], 4000);                      // 240 m from first sight
+  assert.equal(proven.still, undefined); assert.equal(proven.mystery, true); assert.equal(proven.tier, 'lookup');
+  assert.equal(f.apply([plane(-760)], 6000)[0].still, undefined);     // once proven, a pause doesn't re-hide it
+});
+
+test('real ADS-B planes are never held back by the movement check', () => {
+  const [a] = new GhostFilter().apply([{ ...real, tier: 'lookup', overheadNow: true }], 0);
+  assert.equal(a.still, undefined); assert.equal(a.tier, 'lookup');
+});
